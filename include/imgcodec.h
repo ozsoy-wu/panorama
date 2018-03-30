@@ -1,0 +1,6 @@
+#ifndef __PANORAMA_IMGCODEC_H__
+#define __PANORAMA_IMGCODEC_H__
+
+
+
+#endif // __PANORAMA_IMGCODEC_H__
