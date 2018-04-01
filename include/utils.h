@@ -1,6 +1,10 @@
 #ifndef __PANORAMA_UTILS_H__
 #define __PANORAMA_UTILS_H__
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 /* fundamental constants */
 #define PANORAMA_PI   3.1415926535897932384626433832795
 #define PANORAMA_2PI  6.283185307179586476925286766559
@@ -33,6 +37,9 @@
 #define PRINT(type, pEntity)
 #endif
 
+#define DEF_VECTOR_INIT_CAPACITY 8
+#define MAX_VECTOR_CAPACITY 2048
+
 typedef struct Vector_S
 {
 	int selfNeedFree;
@@ -44,6 +51,9 @@ typedef struct Vector_S
 } Vector;
 
 int constructVector(Vector *vPtr, int elemSize, int capacity);
+unsigned char *vectorGetAndReserveTail(Vector *vPtr);
+unsigned char *vectorPop(Vector *vPtr);
+int vectorResize(Vector *vPtr, int newCapa);
 int destructVector(Vector *vPtr);
 
 #endif // __PANORAMA_UTILS_H__

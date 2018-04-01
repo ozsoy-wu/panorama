@@ -21,8 +21,8 @@ typedef struct SurfHF_S
 } SurfHF;
 
 
-int surfFeatureDetect(SURF_CFG *cfg, Image *img, KeyPoint *kp);
-int surfFeatureCompute(SURF_CFG *cfg, Image *img, KeyPoint *kp, KeyPointDescriptor* kpdes);
-int surfFeatureDetectAndCompute(SURF_CFG *cfg, Image *img, KeyPoint *kp, KeyPointDescriptor* kpdes);
+int surfFeatureDetect(SURF_CFG *cfg, Image *img, Vector *kp);
+int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Vector *kpdes);
+int surfFeatureDetectAndCompute(SURF_CFG *cfg, Image *img, Vector *kp, Vector *kpdes);
 
 #endif // __PANORAMA_SURF_H__

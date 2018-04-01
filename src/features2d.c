@@ -1,5 +1,6 @@
 #include <math.h>
 
+#include "panorama.h"
 #include "features2d.h"
 #include "utils.h"
 
@@ -43,4 +44,56 @@ float overlap(KeyPoint *kp1, KeyPoint *kp2 )
 	}
 
 	return ovrl;
+}
+
+int keypointAssignment(KeyPoint *kp, float x, float y, float size,
+		float angle, float response, int octave, int classId)
+{
+	if (!kp)
+	{
+		return PANORAMA_ERROR;
+	}
+
+	kp->pt.x = x;
+	kp->pt.y = y;
+	kp->size = size;
+	kp->angle = angle;
+	kp->response = response;
+	kp->octave = octave;
+	kp->classId = classId;
+
+	return PANORAMA_OK;
+}
+
+int keypointVectorPush(Vector *vPtr, float x, float y, float size,
+		float angle, float response, int octave, int classId)
+{
+	int ret = PANORAMA_OK;
+
+	if (!vPtr)
+	{
+		return PANORAMA_ERROR;
+	}
+
+	if (vPtr->size == vPtr->capacity)
+	{
+		ret = vectorResize(vPtr, vPtr->capacity * 2);
+		if (ret != PANORAMA_OK)
+		{
+			return PANORAMA_ERROR;
+		}
+	}
+
+	KeyPoint *kp = ((KeyPoint *)vPtr->elemArray) + vPtr->size;
+	kp->pt.x = x;
+	kp->pt.y = y;
+	kp->size = size;
+	kp->angle = angle;
+	kp->response = response;
+	kp->octave = octave;
+	kp->classId = classId;
+
+	vPtr->size++;
+
+	return ret;
 }

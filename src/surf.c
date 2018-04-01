@@ -104,6 +104,9 @@ static void calcLayerDetAndTrace( Mat* sum, int size, int sampleStep,
 
 static int interpolateKeypoint( float N9[3][9], int dx, int dy, int ds, KeyPoint *kpt )
 {
+
+#if 0
+	// TODO
     Vec3f b(-(N9[1][5]-N9[1][3])/2,  // Negative 1st deriv with respect to x
             -(N9[1][7]-N9[1][1])/2,  // Negative 1st deriv with respect to y
             -(N9[2][4]-N9[0][4])/2); // Negative 1st deriv with respect to s
@@ -130,7 +133,8 @@ static int interpolateKeypoint( float N9[3][9], int dx, int dy, int ds, KeyPoint
         kpt->pt.y += x[1]*dy;
         kpt->size = (float)cvRound( kpt->size + x[2]*ds );
     }
-    return ok;
+#endif
+    return PANORAMA_OK;
 }
 
 /*
@@ -139,7 +143,7 @@ static int interpolateKeypoint( float N9[3][9], int dx, int dy, int ds, KeyPoint
  */
 static void findMaximaInLayer( Mat *sum, Mat *mask_sum,
                    Mat *dets, Mat *traces,
-                   int *sizes, KeyPoint *keypoints,
+                   int *sizes, Vector *kpVec,
                    int octave, int layer, float hessianThreshold, int sampleStep )
 {
 	int i, j;
@@ -206,7 +210,8 @@ static void findMaximaInLayer( Mat *sum, Mat *mask_sum,
                 /* Check the mask - why not just check the mask at the center of the wavelet? */
                 if( mask_sum )
                 {
-                    const int* mask_ptr = &mask_sum.at<int>(sum_i, sum_j);
+                    //const int* mask_ptr = &mask_sum.at<int>(sum_i, sum_j);
+                    const int* mask_ptr = MAT_AT_COOR(mask_sum, sum_i, sum_j);
                     float mval = calcHaarPattern( mask_ptr, &Dm, 1 );
                     if( mval < 0.5 )
                         continue;
@@ -227,20 +232,30 @@ static void findMaximaInLayer( Mat *sum, Mat *mask_sum,
                     float center_i = sum_i + (size-1)*0.5f;
                     float center_j = sum_j + (size-1)*0.5f;
 
-                    KeyPoint kpt( center_j, center_i, (float)sizes[layer],
-                                  -1, val0, octave, (trace_ptr[j] > 0) - (trace_ptr[j] < 0) );
+			// TODO handle NULL
+			KeyPoint *kp = vectorGetAndReserveTail(kpVec);
+			if (kp)
+			{
+				keypointAssignment(kp, center_j, center_i, (float)sizes[layer],
+					-1, val0, octave, (trace_ptr[j] > 0) - (trace_ptr[j] < 0) );
 
-                    /* Interpolate maxima location within the 3x3x3 neighbourhood  */
-                    int ds = size - sizes[layer-1];
-                    int interp_ok = interpolateKeypoint( N9, sampleStep, sampleStep, ds, kpt );
+				/* Interpolate maxima location within the 3x3x3 neighbourhood  */
+				int ds = size - sizes[layer-1];
+				int interp_ok = interpolateKeypoint( N9, sampleStep, sampleStep, ds, kp );
 
-                    /* Sometimes the interpolation step gives a negative size etc. */
-                    if( interp_ok  )
-                    {
-                        /*printf( "KeyPoint %f %f %d\n", point.pt.x, point.pt.y, point.size );*/
-                        cv::AutoLock lock(findMaximaInLayer_m);
-                        keypoints.push_back(kpt);
-                    }
+				/* Sometimes the interpolation step gives a negative size etc. */
+				if( interp_ok  )
+				{
+					/*printf( "KeyPoint %f %f %d\n", point.pt.x, point.pt.y, point.size );*/
+					/*cv::AutoLock lock(findMaximaInLayer_m);
+					keypoints.push_back(kpt);
+					*/
+				}
+				else
+				{
+					vectorPop(kpVec);
+				}
+			}
                 }
             }
         }
@@ -248,7 +263,7 @@ static void findMaximaInLayer( Mat *sum, Mat *mask_sum,
 }
 
 
-static int fastHessianDetector (Mat *sum, Mat *mask_sum, KeyPoint *keypoints,
+static int fastHessianDetector (Mat *sum, Mat *mask_sum, Vector *keypoints,
                                  int nOctaves, int nOctaveLayers, float hessianThreshold)
 {
 	int i;
@@ -289,7 +304,6 @@ static int fastHessianDetector (Mat *sum, Mat *mask_sum, KeyPoint *keypoints,
 			/* The integral image sum is one pixel bigger than the source image*/
 			col = (sum->cols-1)/step;
 			row = (sum->rows-1)/step;
-
 
 			// TODO first parameter OK? 
 			ret = constructMat(&dets[index], col, row, 1, sizeof(float), NULL);
@@ -340,9 +354,9 @@ static int fastHessianDetector (Mat *sum, Mat *mask_sum, KeyPoint *keypoints,
 			*/
 		int layer = middleIndices[i];
 		int octave = i / nOctaveLayers;
-		findMaximaInLayer( *sum, *mask_sum, *dets, *traces, *sizes,
-		                   *keypoints, octave, layer, hessianThreshold,
-		                   (*sampleSteps)[layer] );
+		findMaximaInLayer( sum, mask_sum, dets, traces, &sizes,
+		                   keypoints, octave, layer, hessianThreshold,
+		                   sampleSteps[layer] );
 	}
 
 	//std::sort(keypoints.begin(), keypoints.end(), KeypointGreater());
@@ -357,19 +371,19 @@ exit:
 	return ret;
 }
 
-int surfFeatureDetect(SURF_CFG *cfg, Image *img, KeyPoint *kp)
+int surfFeatureDetect(SURF_CFG *cfg, Image *img, Vector *kp)
 {
 	PMD();
 	return 0;
 }
 
-int surfFeatureCompute(SURF_CFG *cfg, Image *img, KeyPoint *kp, KeyPointDescriptor* kpdes)
+int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Vector* kpdes)
 {
 	PMD();
 	return 0;
 }
 
-int surfFeatureDetectAndCompute(SURF_CFG *cfg, Image *img, KeyPoint *kp, KeyPointDescriptor* kpdes)
+int surfFeatureDetectAndCompute(SURF_CFG *cfg, Image *img, Vector *kp, Vector *kpdes)
 {
 	int ret = PANORAMA_OK;
 	Mat srcImg;

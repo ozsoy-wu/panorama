@@ -2,6 +2,7 @@
 #define __PANORAMA_FEATURES_H__
 
 #include <math.h>
+#include "utils.h"
 
 #define MAX_KEYPOINTS_NUM 1000
 #define MAX_DESCRIPTOR_NUM 1000
@@ -23,8 +24,6 @@ typedef struct KeyPoint_S
 	int classId;
 } KeyPoint;
 
-typedef struct 
-
 typedef struct KeyPointDescriptor_S
 {
 } KeyPointDescriptor;
@@ -45,8 +44,6 @@ typedef struct KeyPointDescriptor_S
 		res; \
 	})
 
-(float x, float y, float _size, float _angle=-1, float _response=0, int _octave=0, int _class_id=-1);
-
 #define KeyPointAssignment(kp, x, y, size, angle, response, octave, classId) do {\
 	kp->x = (x);\
 	kp->y = (y);\
@@ -57,4 +54,8 @@ typedef struct KeyPointDescriptor_S
 	kp->classId = (classId);\
 } while(0)
 
+int keypointAssignment(KeyPoint *kp, float x, float y, float size,
+		float angle, float response, int octave, int classId);
+int keypointVectorPush(Vector *vPtr, float x, float y, float size,
+		float angle, float response, int octave, int classId);
 #endif // __PANORAMA_FEATURES_H__

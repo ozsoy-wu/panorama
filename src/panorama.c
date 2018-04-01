@@ -216,15 +216,30 @@ int PanoramaProcess (PANORAMA_CTX *ctx)
 	}
 
 	PANORAMA_INNER_CTX *inCtx = GET_INNER_CTX(ctx);
-	KeyPoint kps[MAX_IMAGE_NUM][MAX_KEYPOINTS_NUM] = {0};
-	KeyPointDescriptor kpdes[MAX_IMAGE_NUM][MAX_DESCRIPTOR_NUM] = {0};
+	Vector *kpVecPtr[MAX_IMAGE_NUM];
+	Vector *kpdesVecPtr[MAX_IMAGE_NUM];
 
 	// int surfFeatureDetectAndCompute(SURF_CFG *cfg, Image *img, KeyPoint *kp, KeyPointDescriptor* kpdes)
 	for (i = 0; i < inCtx->imgNum; i++)
 	{
-		inCtx->featureMod.detectAndCompute(inCtx->featureMod.cfg, &inCtx->images[i], &kps[i], &kpdes[i]);
+		constructVector(kpVecPtr[i], sizeof(KeyPoint), -1);
+		if (!kpVecPtr[i])
+		{
+			// TODO clean vector
+			return PANORAMA_ERROR;
+		}
+
+		constructVector(kpdesVecPtr[i], sizeof(KeyPointDescriptor), -1);
+		if (!kpdesVecPtr[i])
+		{
+			// TODO clean vector
+			return PANORAMA_ERROR;
+		}
+
+		inCtx->featureMod.detectAndCompute(inCtx->featureMod.cfg, &inCtx->images[i], &kpVecPtr[i], &kpdesVecPtr[i]);
 	}
 
+	// TODO clean vector
 	return PANORAMA_PROCESS_FINISH;
 }
 

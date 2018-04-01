@@ -39,8 +39,10 @@ typedef struct Matrix_S
 #endif
 } Mat;
 
-#define MAT_ROW_PTR(matPtr, row) ((unsigned char *)(matPtr)->data + ((row) * (matPtr)->step))
-#define MAT_AT_COOR(matPtr, row, col) ((unsigned char *)(matPtr)->data + ((row) * (matPtr)->step) + (col) * (matPtr)->elemSize * (matPtr)->channel)
+#define MAT_ROW_PTR(matPtr, row) ((unsigned char *)((matPtr)->data) + ((row) * (matPtr)->step))
+#define MAT_AT_COOR(matPtr, row, col) ((unsigned char *)((matPtr)->data) + ((row) * (matPtr)->step) + (col) * (matPtr)->elemSize * (matPtr)->channel)
+//#define MAT_ROW_PTR(matPtr, row) NULL
+//#define MAT_AT_COOR(matPtr, row, col) NULL 
 
 int integral(Mat *src, Mat *sum);
 
