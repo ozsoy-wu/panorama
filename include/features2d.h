@@ -3,6 +3,7 @@
 
 #include <math.h>
 #include "utils.h"
+#include "matrix.h"
 
 #define MAX_KEYPOINTS_NUM 1000
 #define MAX_DESCRIPTOR_NUM 1000
@@ -24,9 +25,7 @@ typedef struct KeyPoint_S
 	int classId;
 } KeyPoint;
 
-typedef struct KeyPointDescriptor_S
-{
-} KeyPointDescriptor;
+typedef Mat KeyPointDescriptor;
 
 #define POINT_DISTANCE_P(p1, p2) \
 	({ \

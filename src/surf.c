@@ -383,6 +383,7 @@ exit:
 
 	return ret;
 }
+//-------------------------- keypoint detect end -----------------
 
 int surfFeatureDetect(SURF_CFG *cfg, Image *img, Vector *kp)
 {
@@ -426,13 +427,157 @@ out:
 	return ret;
 }
 
-int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Vector* kpdes)
+int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 {
-	PMD();
-	return 0;
+    enum { ORI_RADIUS = 6, ORI_WIN = 60, PATCH_SZ = 20 };
+
+	if (!cfg || !img || !kp)
+	{
+		Log(LOG_DEBUG, "parameter invalid!\n");
+		return PANORAMA_ERROR;
+	}
+
+	int i, j;
+	int ret = PANORAMA_OK;
+	int N = kp->size;
+	int desCols = cfg->extended ? 128 : 64;
+
+	if (N <= 0)
+	{
+		return PANORAMA_ERROR;
+	}
+
+	if (NULL == *kpdes)
+	{
+		if (PANORAMA_ERROR == constructMat(*kpdes, desCols, N, 1, sizeof(double), NULL))
+		{
+			return PANORAMA_ERROR;
+		}
+	}
+
+	// init
+	const int nOriSampleBound = (2*ORI_RADIUS+1)*(2*ORI_RADIUS+1);
+	int nOriSamples = 0;
+	Vector apt;
+	Vector aptw;
+	Vector DW;
+    std::vector<Point> apt;
+    std::vector<float> aptw;
+    std::vector<float> DW;
+	if (PANORAMA_OK != constructVector(&apt, sizeof(Point), nOriSampleBound) ||
+		PANORAMA_OK != constructVector(&aptw, sizeof(float), nOriSampleBound) ||
+		PANORAMA_OK != constructVector(&DW, sizeof(float), PATCH_SZ*PATCH_SZ))
+	{
+		ret = PANORAMA_ERROR;
+		goto exit;
+	}
+
+	Point *curPt = NULL;
+	float *curFloat = NULL;
+
+	/* Coordinates and weights of samples used to calculate orientation */
+	Mat G_ori = getGaussianKernel( 2*ORI_RADIUS+1, SURF_ORI_SIGMA, CV_32F );
+	nOriSamples = 0;
+	for( i = -ORI_RADIUS; i <= ORI_RADIUS; i++ )
+	{
+		for( j = -ORI_RADIUS; j <= ORI_RADIUS; j++ )
+		{
+			if( i*i + j*j <= ORI_RADIUS*ORI_RADIUS )
+			{
+				curPt = (Point *)VECTOR_AT(&apt, nOriSamples);
+				curPt.x = i;
+				curPt.y = j;
+
+				curFloat = (float *)VECTOR_AT(&aptw, nOriSamples);
+				*curFloat = *(float *)MAT_AT_COOR(&G_ori, i+ORI_RADIUS, 0) * *(float *)MAT_AT_COOR(&G_ori, j+ORI_RADIUS, 0);
+
+				nOriSamples++
+			}
+		}
+	}
+
+	if ( nOriSamples > nOriSampleBound )
+	{
+		ret = PANORAMA_ERROR;
+		goto exit;
+	}
+
+	for (i = 0; i < N; i++)
+	{
+		
+	}
+
+
+
+
+exit:
+	destructVector(&apt);
+	destructVector(&aptw);
+	destructVector(&DW);
+
+	return ret;
+
+
+	
+#if 1
+	int i, j, N = (int)keypoints.size();
+	if( N > 0 )
+	{
+		Mat descriptors;
+		bool _1d = false;
+		int dcols = extended ? 128 : 64;
+		size_t dsize = dcols*sizeof(float);
+
+		if( doDescriptors )
+		{
+			_1d = _descriptors.kind() == _InputArray::STD_VECTOR && _descriptors.type() == CV_32F;
+			if( _1d )
+			{
+				_descriptors.create(N*dcols, 1, CV_32F);
+				descriptors = _descriptors.getMat().reshape(1, N);
+			}
+			else
+			{
+				_descriptors.create(N, dcols, CV_32F);
+				descriptors = _descriptors.getMat();
+			}
+		}
+
+		// we call SURFInvoker in any case, even if we do not need descriptors,
+		// since it computes orientation of each feature.
+		parallel_for_(Range(0, N), SURFInvoker(img, sum, keypoints, descriptors, extended, upright) );
+
+		// remove keypoints that were marked for deletion
+		for( i = j = 0; i < N; i++ )
+		{
+			if( keypoints[i].size > 0 )
+			{
+				if( i > j )
+				{
+					keypoints[j] = keypoints[i];
+					if( doDescriptors )
+						memcpy( descriptors.ptr(j), descriptors.ptr(i), dsize);
+				}
+				j++;
+			}
+		}
+		if( N > j )
+		{
+			N = j;
+			keypoints.resize(N);
+			if( doDescriptors )
+			{
+				Mat d = descriptors.rowRange(0, N);
+				if( _1d )
+					d = d.reshape(1, N*dcols);
+				d.copyTo(_descriptors);
+			}
+		}
+	}
+#endif
 }
 
-int surfFeatureDetectAndCompute(SURF_CFG *cfg, Image *img, Vector *kp, Vector *kpdes)
+int surfFeatureDetectAndCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 {
 	int ret = PANORAMA_OK;
 	Mat srcImg;

@@ -16,8 +16,8 @@ typedef struct FeaturesModule_S
 {
 	void *cfg;
 	int (*detect)(void *cfg, Image *img, Vector *kp);
-	int (*compute)(void *cfg, Image *img, Vector *kp, Vector *kpdes);
-	int (*detectAndCompute)(void *cfg, Image *img, Vector *kp, Vector *kpdes);
+	int (*compute)(void *cfg, Image *img, Vector *kp, Mat **kpdes);
+	int (*detectAndCompute)(void *cfg, Image *img, Vector *kp, Mat **kpdes);
 } FeaturesModule;
 
 typedef struct PANORAMA_INNER_CTX_S

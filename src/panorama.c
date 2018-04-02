@@ -232,12 +232,6 @@ int PanoramaProcess (PANORAMA_CTX *ctx)
 			Log(LOG_ERROR, "construct keypoint vector failed\n");
 			return PANORAMA_ERROR;
 		}
-#ifdef DEBUG_FUNC
-		else
-		{
-			Log(LOG_DEBUG, "vector.capa%d, .size(%d)\n", kpVecPtr[i]->capacity, kpVecPtr[i]->size);
-		}
-#endif
 
 		ret = constructVector(&kpdesVecPtr[i], sizeof(KeyPointDescriptor), -1);
 		if (PANORAMA_ERROR == ret)

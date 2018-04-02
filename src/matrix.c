@@ -125,7 +125,7 @@ int integral(Mat *src, Mat *sum)
 	dstW = sum->cols = src->cols + 1;
 	dstH = sum->rows = src->rows + 1;
 
-	memset(pDst, 0, sum->cols * sum->rows * sizeof(int));
+	memset(pDst, 0, sum->totalSize);
 
 	for (i = 0; i < src->rows; i++)
 	{

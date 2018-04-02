@@ -50,6 +50,8 @@ typedef struct Vector_S
 	void *elemArray;	/* ´æ´¢ÔªËØÎ»ÖÃ */
 } Vector;
 
+#define VECTOR_AT(vecPtr, idx) ((unsigned char *)((vecPtr)->elemArray) + (vecPtr)->elemSize * (idx))
+
 int constructVector(Vector **vPtrIn, int elemSize, int capacity);
 unsigned char *vectorGetAndReserveTail(Vector *vPtr);
 unsigned char *vectorPop(Vector *vPtr);
