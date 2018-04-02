@@ -5,7 +5,7 @@
 
 #define PANO_W 600
 #define PANO_H 240
-#define IMG_NUM 12
+#define IMG_NUM 2
 
 int main(int argc, char **argv)
 {
@@ -16,6 +16,7 @@ int main(int argc, char **argv)
 	char *imgName[IMG_NUM] = {
 		"/home/pg/w/0.yuv",
 		"/home/pg/w/1.yuv",
+		};/*
 		"/home/pg/w/2.yuv",
 		"/home/pg/w/3.yuv",
 		"/home/pg/w/4.yuv",
@@ -26,7 +27,7 @@ int main(int argc, char **argv)
 		"/home/pg/w/9.yuv",
 		"/home/pg/w/10.yuv",
 		"/home/pg/w/11.yuv",
-	};
+	};*/
 	PANORAMA_CTX *ctx = NULL;
 	PANORAMA_CFG cfg;
 

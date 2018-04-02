@@ -1,24 +1,28 @@
+#include "log.h"
 #include "utils.h"
 #include "panorama.h"
 
-int constructVector(Vector *vPtr, int elemSize, int capacity)
+int constructVector(Vector **vPtr, int elemSize, int capacity)
 {
-	int totalSize = 0;
-
 	if (!vPtr)
 	{
-		vPtr = tMalloc(Vector);
-		if (!vPtr)
+		return PANORAMA_ERROR;
+	}
+
+	if (!(*vPtr))
+	{
+		(*vPtr) = tMalloc(Vector);
+		if (!(*vPtr))
 		{
 			return PANORAMA_ERROR;
 		}
-		memset(vPtr, 0, sizeof(Vector));
+		memset(*vPtr, 0, sizeof(Vector));
 
-		vPtr->selfNeedFree = 1;
+		(*vPtr)->selfNeedFree = 1;
 	}
 	else
 	{
-		vPtr->selfNeedFree = 0;
+		(*vPtr)->selfNeedFree = 0;
 	}
 
 	if (-1 == capacity)
@@ -26,20 +30,20 @@ int constructVector(Vector *vPtr, int elemSize, int capacity)
 		capacity = DEF_VECTOR_INIT_CAPACITY;
 	}
 
-	vPtr->elemSize = elemSize;
-	vPtr->capacity = capacity;
-	vPtr->size = 0;
-	vPtr->elemArray = lMalloc(void, elemSize * capacity);
-	if (NULL == vPtr->elemArray)
+	(*vPtr)->elemSize = elemSize;
+	(*vPtr)->capacity = capacity;
+	(*vPtr)->size = 0;
+	(*vPtr)->elemArray = lMalloc(void, elemSize * capacity);
+	if (NULL == (*vPtr)->elemArray)
 	{
-		if (vPtr->selfNeedFree)
+		if ((*vPtr)->selfNeedFree)
 		{
-			FREE(vPtr);
+			FREE(*vPtr);
 		}
 		return PANORAMA_ERROR;
 	}
-	memset(vPtr->elemArray, 0, elemSize * capacity);
-	vPtr->dataNeedFree = 1;
+	memset((*vPtr)->elemArray, 0, elemSize * capacity);
+	(*vPtr)->dataNeedFree = 1;
 
 	return PANORAMA_OK;
 }
@@ -47,7 +51,6 @@ int constructVector(Vector *vPtr, int elemSize, int capacity)
 unsigned char *vectorGetAndReserveTail(Vector *vPtr)
 {
 	unsigned char *res = NULL;
-	unsigned char *tmp = NULL;
 	int oldSize = 0;
 	int newSize = 0;
 
@@ -62,14 +65,13 @@ unsigned char *vectorGetAndReserveTail(Vector *vPtr)
 		{
 			oldSize = vPtr->capacity * vPtr->elemSize;
 			newSize = oldSize<<1;
-			tmp = (unsigned char *)realloc(vPtr->elemArray, newSize); 
-			if (!tmp)
+			vPtr->elemArray = (unsigned char *)realloc(vPtr->elemArray, newSize); 
+			if (!vPtr->elemArray)
 			{
 				return NULL;
 			}
 			memset((unsigned char *)vPtr->elemArray + oldSize,
 					0, newSize - oldSize);
-			vPtr->elemArray = tmp;
 			(vPtr->capacity)<<1;
 		}
 		else
@@ -103,7 +105,6 @@ int vectorResize(Vector *vPtr, int newCapa)
 {
 	int oldSize, newSize;
 	int oldCapa;
-	unsigned char *tmp = NULL;
 
 	if (!vPtr)
 	{
@@ -115,14 +116,14 @@ int vectorResize(Vector *vPtr, int newCapa)
 
 	if (newSize > oldSize)
 	{
-		tmp = (unsigned char *)realloc(vPtr->elemArray, newSize); 
-		if (!tmp)
+		vPtr->elemArray = (unsigned char *)realloc(vPtr->elemArray, newSize); 
+		if (!vPtr->elemArray)
 		{
 			return PANORAMA_ERROR;
 		}
 		memset((unsigned char *)vPtr->elemArray + oldSize,
 				0, newSize - oldSize);
-		vPtr->elemArray = tmp;
+
 		vPtr->capacity = newCapa;
 	}
 	else
@@ -134,18 +135,21 @@ int vectorResize(Vector *vPtr, int newCapa)
 	return PANORAMA_OK;
 }
 
-int destructVector(Vector *vPtr)
+int destructVector(Vector **vPtr)
 {
-	if (vPtr)
+	if (vPtr && *vPtr)
 	{
-		if (vPtr->dataNeedFree)
+		if ((*vPtr)->dataNeedFree)
 		{
-			FREE(vPtr->elemArray);
+			FREE((*vPtr)->elemArray);
 		}
-		if (vPtr->selfNeedFree)
+
+		if ((*vPtr)->selfNeedFree)
 		{
-				FREE(vPtr);
+			FREE(*vPtr);
 		}
+
+		*vPtr = NULL;
 	}
 
 	return PANORAMA_OK;

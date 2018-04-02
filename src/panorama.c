@@ -209,35 +209,54 @@ int PanoramaLoadSrcImgBuffer (PANORAMA_CTX *ctx, char *imgBuf, int bufSize, int 
 int PanoramaProcess (PANORAMA_CTX *ctx)
 {
 	int i;
+	int ret;
 
 	if (!ctx)
 	{
+		Log(LOG_ERROR, "ctx NULL\n");
 		return PANORAMA_ERROR;
 	}
 
 	PANORAMA_INNER_CTX *inCtx = GET_INNER_CTX(ctx);
-	Vector *kpVecPtr[MAX_IMAGE_NUM];
-	Vector *kpdesVecPtr[MAX_IMAGE_NUM];
+	Vector *kpVecPtr[MAX_IMAGE_NUM] = {NULL};
+	Vector *kpdesVecPtr[MAX_IMAGE_NUM] = {NULL};
 
 	// int surfFeatureDetectAndCompute(SURF_CFG *cfg, Image *img, KeyPoint *kp, KeyPointDescriptor* kpdes)
 	for (i = 0; i < inCtx->imgNum; i++)
 	{
-		constructVector(kpVecPtr[i], sizeof(KeyPoint), -1);
-		if (!kpVecPtr[i])
+		ret = constructVector(&kpVecPtr[i], sizeof(KeyPoint), -1);
+		if (PANORAMA_ERROR == ret)
 		{
 			// TODO clean vector
+
+			Log(LOG_ERROR, "construct keypoint vector failed\n");
+			return PANORAMA_ERROR;
+		}
+#ifdef DEBUG_FUNC
+		else
+		{
+			Log(LOG_DEBUG, "vector.capa%d, .size(%d)\n", kpVecPtr[i]->capacity, kpVecPtr[i]->size);
+		}
+#endif
+
+		ret = constructVector(&kpdesVecPtr[i], sizeof(KeyPointDescriptor), -1);
+		if (PANORAMA_ERROR == ret)
+		{
+			// TODO clean vector
+			
+			Log(LOG_ERROR, "construct descriptor vector failed\n");
 			return PANORAMA_ERROR;
 		}
 
-		constructVector(kpdesVecPtr[i], sizeof(KeyPointDescriptor), -1);
-		if (!kpdesVecPtr[i])
-		{
-			// TODO clean vector
-			return PANORAMA_ERROR;
-		}
-
-		inCtx->featureMod.detectAndCompute(inCtx->featureMod.cfg, &inCtx->images[i], &kpVecPtr[i], &kpdesVecPtr[i]);
+		inCtx->featureMod.detectAndCompute(inCtx->featureMod.cfg, &inCtx->images[i], kpVecPtr[i], kpdesVecPtr[i]);
 	}
+
+#ifdef DEBUG_FUNC
+	for (i = 0; i < inCtx->imgNum; i++)
+	{
+		Log(LOG_DEBUG, "image#%d: keypointsCnt:%d\n", i, kpVecPtr[i]->size);
+	}
+#endif
 
 	// TODO clean vector
 	return PANORAMA_PROCESS_FINISH;

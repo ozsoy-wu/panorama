@@ -6,10 +6,25 @@
 #ifdef DEBUG_FUNC
 void printMatrix(void *entity)
 {
+	int *p;
 	Mat *mat = (Mat *)entity;
-	printf("Mat cols=%d, rows=%d\n", mat->cols, mat->rows);
-	printf("Mat channel=%d, elemSize1=%d, elemSize=%d, step=%d, totalSize=%d\n",
+	printf("Mat cols=%d, rows=%d, ", mat->cols, mat->rows);
+	printf("channel=%d, elemSize1=%d, elemSize=%d, step=%d, totalSize=%d\n",
 		mat->channel, mat->elemSize1, mat->elemSize, mat->step, mat->totalSize);
+
+	int i, j;
+	for (i = 0; i < mat->rows; i++)
+	{
+		for (j = 0; j < mat->cols; j++)
+		{
+			p = (int *)MAT_AT_COOR(mat, i, j);
+
+			printf("%d, ", *p);
+			//printf("%f, ", (char)mat->data +mat->step * i + mat->elemSize * j);
+		}
+
+		printf("\n");
+	}
 }
 #endif
 
@@ -93,6 +108,10 @@ int integral(Mat *src, Mat *sum)
 	int i, j, dx, dy, srcW, srcH, dstW, dstH;
 	unsigned char *pSrc = NULL;
 	int *pDst = NULL;
+	int *pDst1 = NULL;
+	int *pDst2 = NULL;
+	int *pDst3 = NULL;
+	int tmp;
 
 	if (!src || !sum || !src->data || !sum->data)
 	{
@@ -113,12 +132,17 @@ int integral(Mat *src, Mat *sum)
 		dx = i + 1;
 		for (j = 0; j < src->cols; j++)
 		{
-			dy = i + 1;
-			pDst[dy * dstW + dx] = pSrc[i * srcW + j] + pDst[(dy - 1) * dstW + dx]
-				+ pDst[dy * dstW + dx - 1] - pDst[(dy - 1) * dstW + dx - 1];
+			dy = j + 1;
+
+			pSrc = MAT_AT_COOR(src, i, j);
+			pDst1 = (int *)MAT_AT_COOR(sum, dx-1, dy);
+			pDst2 =  (int *)MAT_AT_COOR(sum, dx, dy-1);
+			pDst3 =  (int *)MAT_AT_COOR(sum, dx-1, dy-1);
+			pDst =  (int *)MAT_AT_COOR(sum, dx, dy);
+			
+			*pDst = (int)*pSrc + *pDst1 + *pDst2 - *pDst3;
 		}
 	}
-
 
 	return PANORAMA_OK;
 }

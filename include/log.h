@@ -16,6 +16,8 @@ void panorama_log(int type, const char *fn, int line, const char *fmt, ...);
 
 #define Log(type, fmt, ...) panorama_log(type, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
 
+#define Dbg(fmt, ...) Log(LOG_DEBUG, fmt, ##__VA_ARGS__)
+
 #define PANORAMA_LOG(mask, level, fmt...) do {\
 		if ((mask) & (level) break;\
 		printf("%s, %d", __func__, __LINE__);\

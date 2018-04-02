@@ -50,10 +50,10 @@ typedef struct Vector_S
 	void *elemArray;	/* ´æ´¢ÔªËØÎ»ÖÃ */
 } Vector;
 
-int constructVector(Vector *vPtr, int elemSize, int capacity);
+int constructVector(Vector **vPtrIn, int elemSize, int capacity);
 unsigned char *vectorGetAndReserveTail(Vector *vPtr);
 unsigned char *vectorPop(Vector *vPtr);
 int vectorResize(Vector *vPtr, int newCapa);
-int destructVector(Vector *vPtr);
+int destructVector(Vector **vPtr);
 
 #endif // __PANORAMA_UTILS_H__
