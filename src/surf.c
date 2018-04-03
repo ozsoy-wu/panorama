@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <math.h>
 #include "panorama_inner.h"
 #include "panorama.h"
 
@@ -56,27 +57,26 @@ static void resizeHaarPattern( const int src[][5], SurfHF* dst, int n, int oldSi
 static void calcLayerDetAndTrace( Mat* sum, int size, int sampleStep,
                                   Mat *det, Mat *trace )
 {
+#define CALC_DET_TRACE_NX 3
+#define CALC_DET_TRACE_NY 3
+#define CALC_DET_TRACE_NXY 4
 	int i, j;
-#define NX 3
-#define NY 3
-#define NXY 4
-    //const int NX=3, NY=3, NXY=4;
-    const int dx_s[NX][5] = { {0, 2, 3, 7, 1}, {3, 2, 6, 7, -2}, {6, 2, 9, 7, 1} };
-    const int dy_s[NY][5] = { {2, 0, 7, 3, 1}, {2, 3, 7, 6, -2}, {2, 6, 7, 9, 1} };
-    const int dxy_s[NXY][5] = { {1, 1, 4, 4, 1}, {5, 1, 8, 4, -1}, {1, 5, 4, 8, -1}, {5, 5, 8, 8, 1} };
+    const int dx_s[CALC_DET_TRACE_NX][5] = { {0, 2, 3, 7, 1}, {3, 2, 6, 7, -2}, {6, 2, 9, 7, 1} };
+    const int dy_s[CALC_DET_TRACE_NY][5] = { {2, 0, 7, 3, 1}, {2, 3, 7, 6, -2}, {2, 6, 7, 9, 1} };
+    const int dxy_s[CALC_DET_TRACE_NXY][5] = { {1, 1, 4, 4, 1}, {5, 1, 8, 4, -1}, {1, 5, 4, 8, -1}, {5, 5, 8, 8, 1} };
 
-    SurfHF Dx[NX], Dy[NY], Dxy[NXY];
+    SurfHF Dx[CALC_DET_TRACE_NX], Dy[CALC_DET_TRACE_NY], Dxy[CALC_DET_TRACE_NXY];
 
     if( size > sum->rows-1 || size > sum->cols-1 )
        return;
 
-	memset(Dx, 0, NX * sizeof(SurfHF));
-	memset(Dy, 0, NY * sizeof(SurfHF));
-	memset(Dxy, 0, NXY * sizeof(SurfHF));
+	memset(Dx, 0, CALC_DET_TRACE_NX * sizeof(SurfHF));
+	memset(Dy, 0, CALC_DET_TRACE_NY * sizeof(SurfHF));
+	memset(Dxy, 0, CALC_DET_TRACE_NXY * sizeof(SurfHF));
 
-    resizeHaarPattern( dx_s , &Dx , NX , 9, size, sum->cols ); // TODO Dx ? &Dx
-    resizeHaarPattern( dy_s , &Dy , NY , 9, size, sum->cols );
-    resizeHaarPattern( dxy_s, &Dxy, NXY, 9, size, sum->cols );
+    resizeHaarPattern( dx_s , &Dx , CALC_DET_TRACE_NX , 9, size, sum->cols ); // TODO Dx ? &Dx
+    resizeHaarPattern( dy_s , &Dy , CALC_DET_TRACE_NY , 9, size, sum->cols );
+    resizeHaarPattern( dxy_s, &Dxy, CALC_DET_TRACE_NXY, 9, size, sum->cols );
 
     /* The integral image 'sum' is one pixel bigger than the source image */
     int samples_i = 1+(sum->rows-1-size)/sampleStep;
@@ -383,7 +383,107 @@ exit:
 
 	return ret;
 }
-//-------------------------- keypoint detect end -----------------
+//-------------------------- keypoint detect auxiliary end -----------------
+
+
+
+//-------------------------- keypoint descriptor auxiliary begin -----------------
+int getGaussianKernel(Mat *kernel, int n, double sigma)
+{
+#define SMALL_GAUSSIAN_SIZE 7
+	static const float small_gaussian_tab[][SMALL_GAUSSIAN_SIZE] =
+	{
+		{1.f},
+		{0.25f, 0.5f, 0.25f},
+		{0.0625f, 0.25f, 0.375f, 0.25f, 0.0625f},
+		{0.03125f, 0.109375f, 0.21875f, 0.28125f, 0.21875f, 0.109375f, 0.03125f}
+	};
+	const float* fixed_kernel = 0;
+	int i;
+	float* cf = NULL;
+	double sigmaX;
+	double scale2X;
+	double sum;
+	double x, t;
+
+	if (n % 2 == 1 && n <= SMALL_GAUSSIAN_SIZE && sigma <= 0)
+	{
+		fixed_kernel = &small_gaussian_tab[n>>1];
+	}
+
+	if (!kernel)
+	{
+		return PANORAMA_ERROR;
+	}
+
+	cf = (float *)MAT_ROW_PTR(kernel, 0);
+
+	sigmaX = sigma > 0 ? sigma : ((n-1)*0.5 - 1)*0.3 + 0.8;
+	scale2X = -0.5/(sigmaX*sigmaX);
+	sum = 0;
+
+	for( i = 0; i < n; i++ )
+	{
+		x = i - (n-1)*0.5;
+		t = fixed_kernel ? (double)fixed_kernel[i] : exp(scale2X*x*x);
+
+		cf[i] = (float)t;
+		sum += cf[i];
+	}
+
+	sum = 1./sum;
+	for( i = 0; i < n; i++ )
+	{
+		cf[i] = (float)(cf[i]*sum);
+	}
+
+	return PANORAMA_OK;
+}
+
+
+static const float atan2_p1 = 0.9997878412794807f*(float)(180/PANORAMA_PI);
+static const float atan2_p3 = -0.3258083974640975f*(float)(180/PANORAMA_PI);
+static const float atan2_p5 = 0.1555786518463281f*(float)(180/PANORAMA_PI);
+static const float atan2_p7 = -0.04432655554792128f*(float)(180/PANORAMA_PI);
+static const float DBL_EPSILON = 0;
+
+float fastAtan2( float y, float x )
+{
+	float ax = abs(x), ay = abs(y);//首先不分象限，求得一个锐角角度
+	float a, c, c2;
+	if( ax >= ay )
+	{
+		c = ay/(ax + (float)DBL_EPSILON);
+		c2 = c*c;
+		a = (((atan2_p7*c2 + atan2_p5)*c2 + atan2_p3)*c2 + atan2_p1)*c;
+	}
+	else
+	{
+		c = ax/(ay + (float)DBL_EPSILON);
+		c2 = c*c;
+		a = 90.f - (((atan2_p7*c2 + atan2_p5)*c2 + atan2_p3)*c2 + atan2_p1)*c;
+	}
+	if( x < 0 )//锐角求出后，根据x和y的正负性确定向量的方向，即角度
+		a = 180.f - a;
+	if( y < 0 )
+		a = 360.f - a;
+	return a;
+}
+
+
+int fastAtan(float *x, float *y, float *angle, int n, int angleInDegrees)
+{
+	int i;
+	for (i = 0; i < n; i++)
+	{
+		angle[i] = fastAtan2(y[i], x[i]);
+	}
+}
+
+
+//-------------------------- keypoint descriptor auxiliary end -----------------
+
+
 
 int surfFeatureDetect(SURF_CFG *cfg, Image *img, Vector *kp)
 {
@@ -429,7 +529,11 @@ out:
 
 int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 {
-    enum { ORI_RADIUS = 6, ORI_WIN = 60, PATCH_SZ = 20 };
+	//enum { ORI_RADIUS = 6, ORI_WIN = 60, PATCH_SZ = 20 };
+#define ORI_RADIUS 6
+#define ORI_WIN 60
+#define PATCH_SZ 20
+#define nOriSampleBound ((2*ORI_RADIUS+1)*(2*ORI_RADIUS+1))
 
 	if (!cfg || !img || !kp)
 	{
@@ -455,28 +559,27 @@ int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 		}
 	}
 
-	// init
-	const int nOriSampleBound = (2*ORI_RADIUS+1)*(2*ORI_RADIUS+1);
+	// init begin
+	//const int nOriSampleBound = (2*ORI_RADIUS+1)*(2*ORI_RADIUS+1);
 	int nOriSamples = 0;
 	Vector apt;
-	Vector aptw;
-	Vector DW;
-    std::vector<Point> apt;
-    std::vector<float> aptw;
-    std::vector<float> DW;
-	if (PANORAMA_OK != constructVector(&apt, sizeof(Point), nOriSampleBound) ||
-		PANORAMA_OK != constructVector(&aptw, sizeof(float), nOriSampleBound) ||
-		PANORAMA_OK != constructVector(&DW, sizeof(float), PATCH_SZ*PATCH_SZ))
+	if (PANORAMA_OK != constructVector(&apt, sizeof(Point), nOriSampleBound))
 	{
 		ret = PANORAMA_ERROR;
-		goto exit;
+		goto cleanup;
 	}
 
+	float aptw[nOriSampleBound];
+	float DW[PATCH_SZ*PATCH_SZ];
+
 	Point *curPt = NULL;
-	float *curFloat = NULL;
+	Mat G_ori;
+	Mat G_desc;
+
+	constructMat(&G_ori, 1, 2*ORI_RADIUS+1, 1, sizeof(float), NULL);
 
 	/* Coordinates and weights of samples used to calculate orientation */
-	Mat G_ori = getGaussianKernel( 2*ORI_RADIUS+1, SURF_ORI_SIGMA, CV_32F );
+	getGaussianKernel(&G_ori, 2*ORI_RADIUS+1, SURF_ORI_SIGMA);
 	nOriSamples = 0;
 	for( i = -ORI_RADIUS; i <= ORI_RADIUS; i++ )
 	{
@@ -485,13 +588,12 @@ int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 			if( i*i + j*j <= ORI_RADIUS*ORI_RADIUS )
 			{
 				curPt = (Point *)VECTOR_AT(&apt, nOriSamples);
-				curPt.x = i;
-				curPt.y = j;
+				curPt->x = i;
+				curPt->y = j;
 
-				curFloat = (float *)VECTOR_AT(&aptw, nOriSamples);
-				*curFloat = *(float *)MAT_AT_COOR(&G_ori, i+ORI_RADIUS, 0) * *(float *)MAT_AT_COOR(&G_ori, j+ORI_RADIUS, 0);
+				aptw[nOriSamples] = *(float *)MAT_AT_COOR(&G_ori, i+ORI_RADIUS, 0) * *(float *)MAT_AT_COOR(&G_ori, j+ORI_RADIUS, 0);
 
-				nOriSamples++
+				nOriSamples++;
 			}
 		}
 	}
@@ -499,27 +601,262 @@ int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 	if ( nOriSamples > nOriSampleBound )
 	{
 		ret = PANORAMA_ERROR;
-		goto exit;
+		goto cleanup;
 	}
 
+	float *dwP = NULL;
+	float *gdesP0 = NULL;
+	float *gdesP1 = NULL;
+	constructMat(&G_desc, 1, PATCH_SZ, 1, sizeof(float), NULL);
+	for(i = 0; i < PATCH_SZ; i++ )
+	{
+		for(j = 0; j < PATCH_SZ; j++)
+		{
+			gdesP0 = (float *)MAT_AT_COOR(&G_desc, i, 0);
+			gdesP1 = (float *)MAT_AT_COOR(&G_desc, j, 0);
+
+			DW[i*PATCH_SZ+j] = *gdesP0 * *gdesP1;
+		}
+	}
+	// init end
+
+
+	/* X and Y gradient wavelet data */
+#define FEATURE_COMPUTE_NX 2
+#define FEATURE_COMPUTE_NY 2
+	const int dx_s[FEATURE_COMPUTE_NX][5] = {{0, 0, 2, 4, -1}, {2, 0, 4, 4, 1}};
+	const int dy_s[FEATURE_COMPUTE_NY][5] = {{0, 0, 4, 2, 1}, {0, 2, 4, 4, -1}};
+	KeyPoint *curkp = NULL;
+	float maxSize = 0;
+	int imaxSize = 0;
+    float X[nOriSampleBound], Y[nOriSampleBound], angle[nOriSampleBound];
+	//unsigned char PATCH[PATCH_SZ+1][PATCH_SZ+1];
+	float DX[PATCH_SZ][PATCH_SZ], DY[PATCH_SZ][PATCH_SZ];
+	Mat _patch;
+	constructMat(&_patch, PATCH_SZ+1, PATCH_SZ+1, 1, sizeof(unsigned char), NULL);
 	for (i = 0; i < N; i++)
 	{
+		curkp = (KeyPoint *)VECTOR_AT(kp, i);
+		maxSize = MAX(maxSize, curkp->size);
+	}
+
+	imaxSize = MAX(ceil((PATCH_SZ+1)*maxSize*1.2f/9.0f), 1);
+
+	int k, kk, nangle, x, y;
+	float vx, vy;
+	Point *curPoint = NULL;
+	Mat srcImg;
+	Mat sumImg;
+
+	ret = constructMat(&srcImg, img->w, img->h, 1, sizeof(unsigned char), img->data[0]);
+	if (ret != PANORAMA_OK)
+	{
+		goto cleanup;
+	}
+
+	ret = constructMat(&sumImg, img->w + 1, img->h + 1, 1, sizeof(int), NULL);
+	if (ret != PANORAMA_OK)
+	{
+		goto cleanup;
+	}
+
+	integral(&srcImg, &sumImg); // TODO, 这里可以复用detect函数的结果
+	for (k = 0; k < N; k++)
+	{
+		float *vec;
+		SurfHF dx_t[FEATURE_COMPUTE_NX], dy_t[FEATURE_COMPUTE_NY];
+		curkp = (KeyPoint *)VECTOR_AT(kp, k);
+		float size = kp->size;
+		float s = size*1.2f/9.0f;
+		/* To find the dominant orientation, the gradients in x and y are
+		 * sampled in a circle of radius 6s using wavelets of size 4s.
+		 * We ensure the gradient wavelet size is even to ensure the
+		 * wavelet pattern is balanced and symmetric around its center 
+		 */
+		int grad_wav_size = 2*cvRound( 2*s );
+
+		if (sumImg.rows < grad_wav_size || sumImg.cols < grad_wav_size)
+		{
+			/* when grad_wav_size is too big,
+			 * the sampling of gradient will be meaningless
+			 * mark keypoint for deletion.
+			 */
+			curkp->size = -1;
+			continue;
+		}
+
+		float descriptor_dir = 360.f - 90.f;
+
+		if ( 0 == cfg->upright )
+		{
+			resizeHaarPattern( dx_s, &dx_t, FEATURE_COMPUTE_NX, 4, grad_wav_size, sumImg.cols );
+			resizeHaarPattern( dy_s, &dy_t, FEATURE_COMPUTE_NY, 4, grad_wav_size, sumImg.cols );
+
+			for (kk = 0, nangle = 0; kk <nOriSamples; kk++)
+			{
+				curPoint = (Point *)VECTOR_AT(&apt, kk);
+				x = cvRound( curkp->pt.x + curPoint->x*s - (float)(grad_wav_size-1)/2 );
+				y = cvRound( curkp->pt.y + curPoint->y*s - (float)(grad_wav_size-1)/2 );
+				if( y < 0 || y >= sumImg.rows - grad_wav_size ||
+					x < 0 || x >= sumImg.cols - grad_wav_size )
+				{
+					continue;
+				}
+
+				const int* ptr = (const int *)MAT_AT_COOR(&sumImg, y, x);
+				vx = calcHaarPattern( ptr, &dx_t, 2 );
+				vy = calcHaarPattern( ptr, &dy_t, 2 );
+				X[nangle] = vx*aptw[kk];
+				Y[nangle] = vy*aptw[kk];
+				nangle++;
+			}
+
+			if (nangle == 0)
+			{
+				/* No gradient could be sampled because the keypoint is too
+				 * near too one or more of the sides of the image. As we
+				 * therefore cannot find a dominant direction, we skip this
+				 * keypoint and mark it for later deletion from the sequence.
+				 */
+				curkp->size = -1;
+				continue;
+			}
+
+			// TODO 计算角度
+			// phase( Mat(1, nangle, CV_32F, X), Mat(1, nangle, CV_32F, Y), Mat(1, nangle, CV_32F, angle), true );
+			fastAtan(X, Y, angle, nangle, 1);
 		
+			float bestx = 0, besty = 0, descriptor_mod = 0;
+			for( i = 0; i < 360; i += SURF_ORI_SEARCH_INC )
+			{
+				float sumx = 0, sumy = 0, temp_mod;
+				for( j = 0; j < nangle; j++ )
+				{
+					int d = abs(cvRound(angle[j]) - i);
+					if( d < ORI_WIN/2 || d > 360-ORI_WIN/2 )
+					{
+						sumx += X[j];
+						sumy += Y[j];
+					}
+				}
+				temp_mod = sumx*sumx + sumy*sumy;
+				if( temp_mod > descriptor_mod )
+				{
+					descriptor_mod = temp_mod;
+					bestx = sumx;
+					besty = sumy;
+				}
+			}
+			descriptor_dir = fastAtan2( -besty, bestx );
+		}
+
+		curkp->angle = descriptor_dir;
+
+		/* Extract a window of pixels around the keypoint of size 20s */
+		int win_size = (int)((PATCH_SZ+1)*s);
+		if (imaxSize < win_size)
+		{
+			continue;
+		}
+
+		Mat win;
+		constructMat(&win, win_size, win_size, 1, sizeof(float), NULL);
+
+		if( 0 == cfg->upright )
+		{
+			descriptor_dir *= (float)(PANORAMA_PI/180);
+			float sin_dir = -sin(descriptor_dir);
+			float cos_dir =  cos(descriptor_dir);
+
+			/* Subpixel interpolation version (slower). Subpixel not required since
+			the pixels will all get averaged when we scale down to 20 pixels */
+			/*
+			float w[] = { cos_dir, sin_dir, center.x,
+			-sin_dir, cos_dir , center.y };
+			CvMat W = cvMat(2, 3, CV_32F, w);
+			cvGetQuadrangleSubPix( img, &win, &W );
+			*/
+
+			float win_offset = -(float)(win_size-1)/2;
+			float start_x = curkp->pt.x + win_offset*cos_dir + win_offset*sin_dir;
+			float start_y = curkp->pt.y - win_offset*sin_dir + win_offset*cos_dir;
+			unsigned char* WIN = win.data;
+
+			int ncols1 = img->cols-1, nrows1 = img->rows-1;
+			size_t imgstep = img->step;
+			for( i = 0; i < win_size; i++, start_x += sin_dir, start_y += cos_dir )
+			{
+				double pixel_x = start_x;
+				double pixel_y = start_y;
+				for( j = 0; j < win_size; j++, pixel_x += cos_dir, pixel_y -= sin_dir )
+				{
+					int ix = floorf(pixel_x), iy = floorf(pixel_y);
+					if( (unsigned)ix < (unsigned)ncols1 &&
+					(unsigned)iy < (unsigned)nrows1 )
+					{
+						float a = (float)(pixel_x - ix), b = (float)(pixel_y - iy);
+						unsigned char* imgptr = (unsigned char*)MAT_AT_COOR(srcImg, iy, ix);
+						WIN[i*win_size + j] = (unsigned char)cvRound(imgptr[0]*(1.f - a)*(1.f - b) +
+							imgptr[1]*a*(1.f - b) +
+							imgptr[imgstep]*(1.f - a)*b +
+							imgptr[imgstep+1]*a*b);
+					}
+					else
+					{
+						int x = MIN(MAX(cvRound(pixel_x), 0), ncols1);
+						int y = MIN(MAX(cvRound(pixel_y), 0), nrows1);
+						WIN[i*win_size + j] = *(unsigned char*)MAT_AT_COOR(srcImg, y, x);
+					}
+				}
+			}
+
+		}
+		else
+		{
+			// extract rect - slightly optimized version of the code above
+			// TODO: find faster code, as this is simply an extract rect operation,
+			//       e.g. by using cvGetSubRect, problem is the border processing
+			// descriptor_dir == 90 grad
+			// sin_dir == 1
+			// cos_dir == 0
+
+			float win_offset = -(float)(win_size-1)/2;
+			int start_x = cvRound(curkp->pt.x + win_offset);
+			int start_y = cvRound(curkp->pt.y - win_offset);
+			unsigned char* WIN = win.data;
+			for( i = 0; i < win_size; i++, start_x++ )
+			{
+				int pixel_x = start_x;
+				int pixel_y = start_y;
+				for( j = 0; j < win_size; j++, pixel_y-- )
+				{
+					int x = MAX( pixel_x, 0 );
+					int y = MAX( pixel_y, 0 );
+					x = MIN( x, srcImg->cols-1 );
+					y = MIN( y, srcImg->rows-1 );
+					WIN[i*win_size + j] = *(unsigned char*)MAT_AT_COOR(srcImg, y, x);
+				}
+			}
+		}
+		// Scale the window to size PATCH_SZ so each pixel's size is s. This
+		// makes calculating the gradients with wavelets of size 2s easy
+		resize(win, _patch, _patch.size(), 0, 0, INTER_AREA);
 	}
 
 
-
-
-exit:
+cleanup:
+	destructMat(&sumImg);
+	destructMat(&srcImg);
+	destructMat(&_patch);
+	destructMat(&G_desc);
+	destructMat(&G_ori);
 	destructVector(&apt);
-	destructVector(&aptw);
-	destructVector(&DW);
 
 	return ret;
 
 
 	
-#if 1
+#if 0
 	int i, j, N = (int)keypoints.size();
 	if( N > 0 )
 	{

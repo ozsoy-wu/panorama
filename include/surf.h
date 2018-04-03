@@ -22,7 +22,8 @@ typedef struct SurfHF_S
 
 
 int surfFeatureDetect(SURF_CFG *cfg, Image *img, Vector *kp);
-int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Vector *kpdes);
-int surfFeatureDetectAndCompute(SURF_CFG *cfg, Image *img, Vector *kp, Vector *kpdes);
+int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes);
+int surfFeatureDetectAndCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes);
+
 
 #endif // __PANORAMA_SURF_H__
