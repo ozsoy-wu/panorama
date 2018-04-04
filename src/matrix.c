@@ -98,6 +98,13 @@ int destructMat(Mat *matPtr)
 	return PANORAMA_OK;
 }
 
+int resizeMat()
+{
+
+	return PANORAMA_OK;
+
+}
+
 /*
 * 计算矩阵积分
 * 结果保存到sum中

@@ -782,8 +782,8 @@ int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 			float start_y = curkp->pt.y - win_offset*sin_dir + win_offset*cos_dir;
 			unsigned char* WIN = win.data;
 
-			int ncols1 = img->cols-1, nrows1 = img->rows-1;
-			size_t imgstep = img->step;
+			int ncols1 = srcImg.cols-1, nrows1 = srcImg.rows-1;
+			size_t imgstep = srcImg.step;
 			for( i = 0; i < win_size; i++, start_x += sin_dir, start_y += cos_dir )
 			{
 				double pixel_x = start_x;
@@ -795,7 +795,7 @@ int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 					(unsigned)iy < (unsigned)nrows1 )
 					{
 						float a = (float)(pixel_x - ix), b = (float)(pixel_y - iy);
-						unsigned char* imgptr = (unsigned char*)MAT_AT_COOR(srcImg, iy, ix);
+						unsigned char* imgptr = (unsigned char*)MAT_AT_COOR(&srcImg, iy, ix);
 						WIN[i*win_size + j] = (unsigned char)cvRound(imgptr[0]*(1.f - a)*(1.f - b) +
 							imgptr[1]*a*(1.f - b) +
 							imgptr[imgstep]*(1.f - a)*b +
@@ -805,7 +805,7 @@ int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 					{
 						int x = MIN(MAX(cvRound(pixel_x), 0), ncols1);
 						int y = MIN(MAX(cvRound(pixel_y), 0), nrows1);
-						WIN[i*win_size + j] = *(unsigned char*)MAT_AT_COOR(srcImg, y, x);
+						WIN[i*win_size + j] = *(unsigned char*)MAT_AT_COOR(&srcImg, y, x);
 					}
 				}
 			}
@@ -832,15 +832,19 @@ int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 				{
 					int x = MAX( pixel_x, 0 );
 					int y = MAX( pixel_y, 0 );
-					x = MIN( x, srcImg->cols-1 );
-					y = MIN( y, srcImg->rows-1 );
-					WIN[i*win_size + j] = *(unsigned char*)MAT_AT_COOR(srcImg, y, x);
+					x = MIN( x, srcImg.cols-1 );
+					y = MIN( y, srcImg.rows-1 );
+					WIN[i*win_size + j] = *(unsigned char*)MAT_AT_COOR(&srcImg, y, x);
 				}
 			}
 		}
 		// Scale the window to size PATCH_SZ so each pixel's size is s. This
 		// makes calculating the gradients with wavelets of size 2s easy
-		resize(win, _patch, _patch.size(), 0, 0, INTER_AREA);
+
+		// TODO
+		// https://blog.csdn.net/woainishifu/article/details/53260546
+		resizeMat();
+		// resize(win, _patch, _patch.size(), 0, 0, INTER_AREA);
 	}
 
 

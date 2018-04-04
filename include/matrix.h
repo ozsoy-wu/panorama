@@ -46,6 +46,8 @@ int integral(Mat *src, Mat *sum);
 
 int constructMat(Mat *matPtr, int cols, int rows, int channel, int elemSize1, unsigned char *dataPtr);
 int destructMat(Mat *matPtr);
+int resizeMat();
+
 
 
 /*
