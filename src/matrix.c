@@ -131,6 +131,7 @@ int resizeMat(Mat *src, Mat *dst, double fx, double fy, INTERPOLATION_METHOD met
 			case 1:
 				for( x = 0; x <= dst->cols - 2; x += 2 )
 				{
+					// TODO, 可优化，将xofsrc记录到数组，可避免重复计算
 					sx = (int)floor(x * ifx);
 					xOfSrc = MIN(sx, src->cols - 1) * pix_size;
 					D[x] = S[xOfSrc];

@@ -9,6 +9,7 @@
 #include "features2d.h"
 #include "matrix.h"
 #include "surf.h"
+#include "features_match.h"
 
 
 #define MAX_IMAGE_NUM 12
@@ -30,6 +31,9 @@ typedef struct FeaturesMatcher_S
 typedef struct PANORAMA_INNER_CTX_S
 {
 	int imgNum;
+
+	Vector *kpVecPtr[MAX_IMAGE_NUM];
+	Mat *kpdesVecPtr[MAX_IMAGE_NUM];
 
 	FeaturesFinder featureFinder;
 

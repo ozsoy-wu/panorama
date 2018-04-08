@@ -4,6 +4,7 @@
 
 #include "panorama_inner.h"
 #include "panorama.h"
+#include "stitch.h"
 
 static int ctxCnt = 0;
 int gLogMask;
@@ -218,43 +219,78 @@ int PanoramaProcess (PANORAMA_CTX *ctx)
 	}
 
 	PANORAMA_INNER_CTX *inCtx = GET_INNER_CTX(ctx);
-	Vector *kpVecPtr[MAX_IMAGE_NUM] = {NULL};
-	Mat *kpdesVecPtr[MAX_IMAGE_NUM] = {NULL};
+	//Vector *kpVecPtr[MAX_IMAGE_NUM] = {NULL};
+	//Mat *kpdesVecPtr[MAX_IMAGE_NUM] = {NULL};
 
 	// int surfFeatureDetectAndCompute(SURF_CFG *cfg, Image *img, KeyPoint *kp, KeyPointDescriptor* kpdes)
 	for (i = 0; i < inCtx->imgNum; i++)
 	{
-		ret = constructVector(&kpVecPtr[i], sizeof(KeyPoint), -1);
-		if (PANORAMA_ERROR == ret)
+		ret = constructVector(&(inCtx->kpVecPtr[i]), sizeof(KeyPoint), -1);
+		if (PANORAMA_OK != ret)
 		{
-			// TODO clean vector
-
-			Log(LOG_ERROR, "construct keypoint vector failed\n");
-			return PANORAMA_ERROR;
+			Log(LOG_ERROR, "image#%d: construct keypoint vector failed\n", i);
+			ret = PANORAMA_ERROR;
+			goto clean;
 		}
 
-		inCtx->featureFinder.detectAndCompute(inCtx->featureFinder.cfg, &inCtx->images[i], kpVecPtr[i], &kpdesVecPtr[i]);
+		ret = inCtx->featureFinder.detectAndCompute(
+			inCtx->featureFinder.cfg,
+			&inCtx->images[i],
+			inCtx->kpVecPtr[i],
+			&(inCtx->kpdesVecPtr[i]));
+		if (PANORAMA_OK != ret)
+		{
+			Log(LOG_ERROR, "image#%d: feature detect and compute failed\n", i);
+			ret = PANORAMA_ERROR;
+			goto clean;
+		}
 	}
 
 #ifdef DEBUG_FUNC
 	for (i = 0; i < inCtx->imgNum; i++)
 	{
-		Log(LOG_DEBUG, "image#%d: keypointsCnt:%d\n", i, kpVecPtr[i]->size);
+		int j;
+		KeyPoint *curkp = NULL;
+		Log(LOG_DEBUG, "image#%d: keypointsCnt:%d\n", i, inCtx->kpVecPtr[i]->size);
+		for (j = 0; j < inCtx->kpVecPtr[i]->size; j++)
+		{
+			curkp = (KeyPoint *)VECTOR_AT(inCtx->kpVecPtr[i], j);
+			//printf("[%f, %f]\n", curkp->pt.x, curkp->pt.y);
+		}
 	}
 	for (i = 0; i < inCtx->imgNum; i++)
 	{
-		Log(LOG_DEBUG, "image#%d: keypoints descriptor, cnt:%d, dimension:%d\n", i, kpdesVecPtr[i]->rows, kpdesVecPtr[i]->cols);
+		Log(LOG_DEBUG, "image#%d: keypoints descriptor, cnt:%d, dimension:%d\n", i, inCtx->kpdesVecPtr[i]->rows, inCtx->kpdesVecPtr[i]->cols);
+		//PRINT(Mat, inCtx->kpdesVecPtr[i]);
 	}
-	
 #endif
 
-	for (i = 0; i < inCtx->imgNum; i++)
+	ret = knnMatcher();
+	if (PANORAMA_OK != ret)
 	{
-		destructVector(&kpVecPtr[i]);
-		destructMat(&kpdesVecPtr[i]);
+		Log(LOG_ERROR, "feature match failed\n");
+		ret = PANORAMA_ERROR;
+		goto clean;
 	}
 
-	return PANORAMA_PROCESS_FINISH;
+	ret = stitch(inCtx);
+	if (PANORAMA_OK != ret)
+	{
+		Log(LOG_ERROR, "image stitch failed\n");
+		ret = PANORAMA_ERROR;
+		goto clean;
+	}
+
+	ret = PANORAMA_PROCESS_FINISH;
+
+clean:
+	for (i = 0; i < inCtx->imgNum; i++)
+	{
+		destructVector(&(inCtx->kpVecPtr[i]));
+		destructMat(&(inCtx->kpdesVecPtr[i]));
+	}
+
+	return ret;
 }
 
 int PanoramaProcessQuery (PANORAMA_CTX *ctx)

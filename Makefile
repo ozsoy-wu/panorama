@@ -23,6 +23,8 @@ _OBJS += vector.o
 _OBJS += utils.o
 _OBJS += log.o
 _OBJS += surf.o
+_OBJS += features_match.o
+_OBJS += stitch.o
 _OBJS += panorama.o
 
 APPNAME=pn

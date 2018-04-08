@@ -14,8 +14,8 @@ int main(int argc, char **argv)
 	IMG_FORMAT panoFmt;
 	char *pano = NULL; 
 	char *imgName[IMG_NUM] = {
-		"/home/pg/w/0.yuv",
 		"/home/pg/w/1.yuv",
+		"/home/pg/w/0.yuv",
 		};/*
 		"/home/pg/w/2.yuv",
 		"/home/pg/w/3.yuv",

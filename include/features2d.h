@@ -1,5 +1,5 @@
-#ifndef __PANORAMA_FEATURES_H__
-#define __PANORAMA_FEATURES_H__
+#ifndef __PANORAMA_FEATURES2D_H__
+#define __PANORAMA_FEATURES2D_H__
 
 #include <math.h>
 #include "utils.h"
@@ -58,4 +58,4 @@ int keypointAssignment(KeyPoint *kp, float x, float y, float size,
 		float angle, float response, int octave, int classId);
 int keypointVectorPush(Vector *vPtr, float x, float y, float size,
 		float angle, float response, int octave, int classId);
-#endif // __PANORAMA_FEATURES_H__
+#endif // __PANORAMA_FEATURES2D_H__
