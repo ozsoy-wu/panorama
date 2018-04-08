@@ -16,12 +16,7 @@ static const int SURF_HAAR_SIZE0 = 9;
 // above and below are aligned correctly.
 static const int SURF_HAAR_SIZE_INC = 6;
 
-inline int cvRound( double value )
-{
-    return (int)(value + (value >= 0 ? 0.5 : -0.5));
-}
-
-inline float calcHaarPattern( const int* origin, const SurfHF* f, int n )
+static float calcHaarPattern( const int* origin, const SurfHF* f, int n )
 {
 	int k;
     double d = 0;
@@ -29,7 +24,6 @@ inline float calcHaarPattern( const int* origin, const SurfHF* f, int n )
         d += (origin[f[k].p0] + origin[f[k].p3] - origin[f[k].p1] - origin[f[k].p2])*f[k].w;
     return (float)d;
 }
-
 
 static void resizeHaarPattern( const int src[][5], SurfHF* dst, int n, int oldSize, int newSize, int widthStep )
 {
@@ -163,7 +157,7 @@ static int interpolateKeypoint( float N9[3][9], int dx, int dy, int ds, KeyPoint
  * scale-space pyramid
  */
 static void findMaximaInLayer( Mat *sum, Mat *mask_sum,
-	Mat *dets, Mat *traces,
+	Mat **dets, Mat **traces,
 	int *sizes, Vector *kpVecPtr,
 	int octave, int layer, float hessianThreshold, int sampleStep )
 {
@@ -186,7 +180,7 @@ static void findMaximaInLayer( Mat *sum, Mat *mask_sum,
 	if( mask_sum )
 		resizeHaarPattern( dm, &Dm, NM, 9, size, mask_sum->cols );
 
-	int step = (int)(dets[layer].step/dets[layer].elemSize);
+	int step = (int)(dets[layer]->step/dets[layer]->elemSize);
 
 	for( i = margin; i < layer_rows - margin; i++ )
 	{
@@ -194,8 +188,8 @@ static void findMaximaInLayer( Mat *sum, Mat *mask_sum,
 		const float* det_ptr = dets[layer].ptr<float>(i);
 		const float* trace_ptr = traces[layer].ptr<float>(i);
 		*/
-		const float* det_ptr = (const float *)MAT_ROW_PTR(&dets[layer], i);
-		const float* trace_ptr = (const float *)MAT_ROW_PTR(&traces[layer], i);
+		const float* det_ptr = (const float *)MAT_ROW_PTR(dets[layer], i);
+		const float* trace_ptr = (const float *)MAT_ROW_PTR(traces[layer], i);
 		for( j = margin; j < layer_cols-margin; j++ )
 		{
 			float val0 = det_ptr[j];
@@ -215,9 +209,9 @@ static void findMaximaInLayer( Mat *sum, Mat *mask_sum,
 				const float *det2 = &dets[layer].at<float>(i, j);
 				const float *det3 = &dets[layer+1].at<float>(i, j);
 				*/
-				const float *det1 = (const float *)MAT_AT_COOR(&dets[layer - 1], i, j);
-				const float *det2 = (const float *)MAT_AT_COOR(&dets[layer], i, j);
-				const float *det3 = (const float *)MAT_AT_COOR(&dets[layer + 1], i, j);
+				const float *det1 = (const float *)MAT_AT_COOR(dets[layer - 1], i, j);
+				const float *det2 = (const float *)MAT_AT_COOR(dets[layer], i, j);
+				const float *det3 = (const float *)MAT_AT_COOR(dets[layer + 1], i, j);
 
 				float N9[3][9] = { { det1[-step-1], det1[-step], det1[-step+1],
 				     det1[-1]  , det1[0] , det1[1],
@@ -293,19 +287,16 @@ static int fastHessianDetector (Mat *sum, Mat *mask_sum, Vector *kpVecPtr,
 	int nTotalLayers = (nOctaveLayers+2)*nOctaves;
 	int nMiddleLayers = nOctaveLayers*nOctaves;
 
-	Mat dets[nTotalLayers];
-	Mat traces[nTotalLayers];
+	Mat *dets[nTotalLayers];
+	Mat *traces[nTotalLayers];
 	int sizes[nTotalLayers];
 	int sampleSteps[nTotalLayers];
 	int middleIndices[nMiddleLayers];
 
-
 	for (i = 0; i < nTotalLayers; i++)
 	{
-		dets[i].data = NULL;
-		dets[i].dataNeedFreeByMat = 0;
-		traces[i].data = NULL;
-		traces[i].dataNeedFreeByMat = 0;
+		dets[i] = NULL;
+		traces[i] = NULL;
 	}
 
 	for(octave = 0; octave < nOctaves; octave++ )
@@ -347,7 +338,7 @@ static int fastHessianDetector (Mat *sum, Mat *mask_sum, Vector *kpVecPtr,
 	*/
 	for (i = 0; i < nTotalLayers; i++)
 	{
-		calcLayerDetAndTrace(sum, sizes[i], sampleSteps[i], &dets[i], &traces[i]);
+		calcLayerDetAndTrace(sum, sizes[i], sampleSteps[i], dets[i], traces[i]);
 
 		//PRINT(Mat, &dets[i]);
 	}
@@ -367,6 +358,8 @@ static int fastHessianDetector (Mat *sum, Mat *mask_sum, Vector *kpVecPtr,
 			*/
 		int layer = middleIndices[i];
 		int octave = i / nOctaveLayers;
+
+		// TODO
 		findMaximaInLayer( sum, mask_sum, dets, traces, &sizes,
 		                   kpVecPtr, octave, layer, hessianThreshold,
 		                   sampleSteps[layer] );
@@ -535,7 +528,7 @@ int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 #define PATCH_SZ 20
 #define nOriSampleBound ((2*ORI_RADIUS+1)*(2*ORI_RADIUS+1))
 
-	if (!cfg || !img || !kp)
+	if (!cfg || !img || !kp || !kpdes)
 	{
 		Log(LOG_DEBUG, "parameter invalid!\n");
 		return PANORAMA_ERROR;
@@ -553,7 +546,7 @@ int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 
 	if (NULL == *kpdes)
 	{
-		if (PANORAMA_ERROR == constructMat(*kpdes, desCols, N, 1, sizeof(double), NULL))
+		if (PANORAMA_ERROR == constructMat(kpdes, desCols, N, 1, sizeof(float), NULL))
 		{
 			return PANORAMA_ERROR;
 		}
@@ -562,7 +555,7 @@ int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 	// init begin
 	//const int nOriSampleBound = (2*ORI_RADIUS+1)*(2*ORI_RADIUS+1);
 	int nOriSamples = 0;
-	Vector apt;
+	Vector *apt = NULL;
 	if (PANORAMA_OK != constructVector(&apt, sizeof(Point), nOriSampleBound))
 	{
 		ret = PANORAMA_ERROR;
@@ -573,13 +566,13 @@ int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 	float DW[PATCH_SZ*PATCH_SZ];
 
 	Point *curPt = NULL;
-	Mat G_ori;
-	Mat G_desc;
+	Mat *G_ori = NULL;
+	Mat *G_desc = NULL;
 
 	constructMat(&G_ori, 1, 2*ORI_RADIUS+1, 1, sizeof(float), NULL);
 
 	/* Coordinates and weights of samples used to calculate orientation */
-	getGaussianKernel(&G_ori, 2*ORI_RADIUS+1, SURF_ORI_SIGMA);
+	getGaussianKernel(G_ori, 2*ORI_RADIUS+1, SURF_ORI_SIGMA);
 	nOriSamples = 0;
 	for( i = -ORI_RADIUS; i <= ORI_RADIUS; i++ )
 	{
@@ -587,11 +580,11 @@ int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 		{
 			if( i*i + j*j <= ORI_RADIUS*ORI_RADIUS )
 			{
-				curPt = (Point *)VECTOR_AT(&apt, nOriSamples);
+				curPt = (Point *)VECTOR_AT(apt, nOriSamples);
 				curPt->x = i;
 				curPt->y = j;
 
-				aptw[nOriSamples] = *(float *)MAT_AT_COOR(&G_ori, i+ORI_RADIUS, 0) * *(float *)MAT_AT_COOR(&G_ori, j+ORI_RADIUS, 0);
+				aptw[nOriSamples] = *(float *)MAT_AT_COOR(G_ori, i+ORI_RADIUS, 0) * *(float *)MAT_AT_COOR(G_ori, j+ORI_RADIUS, 0);
 
 				nOriSamples++;
 			}
@@ -612,8 +605,8 @@ int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 	{
 		for(j = 0; j < PATCH_SZ; j++)
 		{
-			gdesP0 = (float *)MAT_AT_COOR(&G_desc, i, 0);
-			gdesP1 = (float *)MAT_AT_COOR(&G_desc, j, 0);
+			gdesP0 = (float *)MAT_AT_COOR(G_desc, i, 0);
+			gdesP1 = (float *)MAT_AT_COOR(G_desc, j, 0);
 
 			DW[i*PATCH_SZ+j] = *gdesP0 * *gdesP1;
 		}
@@ -632,7 +625,7 @@ int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
     float X[nOriSampleBound], Y[nOriSampleBound], angle[nOriSampleBound];
 	//unsigned char PATCH[PATCH_SZ+1][PATCH_SZ+1];
 	float DX[PATCH_SZ][PATCH_SZ], DY[PATCH_SZ][PATCH_SZ];
-	Mat _patch;
+	Mat *_patch = NULL;
 	constructMat(&_patch, PATCH_SZ+1, PATCH_SZ+1, 1, sizeof(unsigned char), NULL);
 	for (i = 0; i < N; i++)
 	{
@@ -645,8 +638,8 @@ int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 	int k, kk, nangle, x, y;
 	float vx, vy;
 	Point *curPoint = NULL;
-	Mat srcImg;
-	Mat sumImg;
+	Mat *srcImg = NULL;
+	Mat *sumImg = NULL;
 
 	ret = constructMat(&srcImg, img->w, img->h, 1, sizeof(unsigned char), img->data[0]);
 	if (ret != PANORAMA_OK)
@@ -660,13 +653,13 @@ int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 		goto cleanup;
 	}
 
-	integral(&srcImg, &sumImg); // TODO, 这里可以复用detect函数的结果
+	integral(srcImg, sumImg); // TODO, 这里可以复用detect函数的结果
 	for (k = 0; k < N; k++)
 	{
 		float *vec;
 		SurfHF dx_t[FEATURE_COMPUTE_NX], dy_t[FEATURE_COMPUTE_NY];
 		curkp = (KeyPoint *)VECTOR_AT(kp, k);
-		float size = kp->size;
+		float size = curkp->size;
 		float s = size*1.2f/9.0f;
 		/* To find the dominant orientation, the gradients in x and y are
 		 * sampled in a circle of radius 6s using wavelets of size 4s.
@@ -675,7 +668,7 @@ int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 		 */
 		int grad_wav_size = 2*cvRound( 2*s );
 
-		if (sumImg.rows < grad_wav_size || sumImg.cols < grad_wav_size)
+		if (sumImg->rows < grad_wav_size || sumImg->cols < grad_wav_size)
 		{
 			/* when grad_wav_size is too big,
 			 * the sampling of gradient will be meaningless
@@ -689,21 +682,21 @@ int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 
 		if ( 0 == cfg->upright )
 		{
-			resizeHaarPattern( dx_s, &dx_t, FEATURE_COMPUTE_NX, 4, grad_wav_size, sumImg.cols );
-			resizeHaarPattern( dy_s, &dy_t, FEATURE_COMPUTE_NY, 4, grad_wav_size, sumImg.cols );
+			resizeHaarPattern( dx_s, &dx_t, FEATURE_COMPUTE_NX, 4, grad_wav_size, sumImg->cols );
+			resizeHaarPattern( dy_s, &dy_t, FEATURE_COMPUTE_NY, 4, grad_wav_size, sumImg->cols );
 
 			for (kk = 0, nangle = 0; kk <nOriSamples; kk++)
 			{
-				curPoint = (Point *)VECTOR_AT(&apt, kk);
+				curPoint = (Point *)VECTOR_AT(apt, kk);
 				x = cvRound( curkp->pt.x + curPoint->x*s - (float)(grad_wav_size-1)/2 );
 				y = cvRound( curkp->pt.y + curPoint->y*s - (float)(grad_wav_size-1)/2 );
-				if( y < 0 || y >= sumImg.rows - grad_wav_size ||
-					x < 0 || x >= sumImg.cols - grad_wav_size )
+				if( y < 0 || y >= sumImg->rows - grad_wav_size ||
+					x < 0 || x >= sumImg->cols - grad_wav_size )
 				{
 					continue;
 				}
 
-				const int* ptr = (const int *)MAT_AT_COOR(&sumImg, y, x);
+				const int* ptr = (const int *)MAT_AT_COOR(sumImg, y, x);
 				vx = calcHaarPattern( ptr, &dx_t, 2 );
 				vy = calcHaarPattern( ptr, &dy_t, 2 );
 				X[nangle] = vx*aptw[kk];
@@ -759,8 +752,8 @@ int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 			continue;
 		}
 
-		Mat win;
-		constructMat(&win, win_size, win_size, 1, sizeof(float), NULL);
+		Mat *win = NULL;
+		constructMat(&win, win_size, win_size, 1, sizeof(unsigned char), NULL);
 
 		if( 0 == cfg->upright )
 		{
@@ -780,10 +773,10 @@ int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 			float win_offset = -(float)(win_size-1)/2;
 			float start_x = curkp->pt.x + win_offset*cos_dir + win_offset*sin_dir;
 			float start_y = curkp->pt.y - win_offset*sin_dir + win_offset*cos_dir;
-			unsigned char* WIN = win.data;
+			unsigned char* WIN = win->data;
 
-			int ncols1 = srcImg.cols-1, nrows1 = srcImg.rows-1;
-			size_t imgstep = srcImg.step;
+			int ncols1 = srcImg->cols-1, nrows1 = srcImg->rows-1;
+			size_t imgstep = srcImg->step;
 			for( i = 0; i < win_size; i++, start_x += sin_dir, start_y += cos_dir )
 			{
 				double pixel_x = start_x;
@@ -795,7 +788,7 @@ int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 					(unsigned)iy < (unsigned)nrows1 )
 					{
 						float a = (float)(pixel_x - ix), b = (float)(pixel_y - iy);
-						unsigned char* imgptr = (unsigned char*)MAT_AT_COOR(&srcImg, iy, ix);
+						unsigned char* imgptr = (unsigned char*)MAT_AT_COOR(srcImg, iy, ix);
 						WIN[i*win_size + j] = (unsigned char)cvRound(imgptr[0]*(1.f - a)*(1.f - b) +
 							imgptr[1]*a*(1.f - b) +
 							imgptr[imgstep]*(1.f - a)*b +
@@ -805,7 +798,7 @@ int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 					{
 						int x = MIN(MAX(cvRound(pixel_x), 0), ncols1);
 						int y = MIN(MAX(cvRound(pixel_y), 0), nrows1);
-						WIN[i*win_size + j] = *(unsigned char*)MAT_AT_COOR(&srcImg, y, x);
+						WIN[i*win_size + j] = *(unsigned char*)MAT_AT_COOR(srcImg, y, x);
 					}
 				}
 			}
@@ -823,7 +816,7 @@ int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 			float win_offset = -(float)(win_size-1)/2;
 			int start_x = cvRound(curkp->pt.x + win_offset);
 			int start_y = cvRound(curkp->pt.y - win_offset);
-			unsigned char* WIN = win.data;
+			unsigned char* WIN = win->data;
 			for( i = 0; i < win_size; i++, start_x++ )
 			{
 				int pixel_x = start_x;
@@ -832,19 +825,107 @@ int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 				{
 					int x = MAX( pixel_x, 0 );
 					int y = MAX( pixel_y, 0 );
-					x = MIN( x, srcImg.cols-1 );
-					y = MIN( y, srcImg.rows-1 );
-					WIN[i*win_size + j] = *(unsigned char*)MAT_AT_COOR(&srcImg, y, x);
+					x = MIN( x, srcImg->cols-1 );
+					y = MIN( y, srcImg->rows-1 );
+					WIN[i*win_size + j] = *(unsigned char*)MAT_AT_COOR(srcImg, y, x);
 				}
 			}
 		}
 		// Scale the window to size PATCH_SZ so each pixel's size is s. This
 		// makes calculating the gradients with wavelets of size 2s easy
 
-		// TODO
-		// https://blog.csdn.net/woainishifu/article/details/53260546
-		resizeMat();
+		// TODO, 检查resize函数是否工作正常 
+		resizeMat(win, _patch, (double)(_patch->cols / (double)win->cols), (double)(_patch->rows / (double)win->rows), INTER_NEAREST);
 		// resize(win, _patch, _patch.size(), 0, 0, INTER_AREA);
+
+		// Calculate gradients in x and y with wavelets of size 2s
+		for( i = 0; i < PATCH_SZ; i++ )
+		{
+			for( j = 0; j < PATCH_SZ; j++ )
+			{
+				float dw = DW[i*PATCH_SZ + j];
+
+				float vi0j0 = *(float *)MAT_AT_COOR(_patch, i, j);
+				float vi1j0 = *(float *)MAT_AT_COOR(_patch, i+1, j);
+				float vi0j1 = *(float *)MAT_AT_COOR(_patch, i, j+1);
+				float vi1j1 = *(float *)MAT_AT_COOR(_patch, i+1, j+1);
+				float vx = (vi0j1 - vi0j0 + vi1j1 - vi1j0) * dw;
+				float vy = (vi1j0 - vi0j0 + vi1j1 - vi0j1) * dw;
+				DX[i][j] = vx;
+				DY[i][j] = vy;
+			}
+		}
+
+		// Construct the descriptor
+		vec = (float *)MAT_ROW_PTR(*kpdes, k);
+		for( kk = 0; kk < desCols; kk++ )
+		{
+			vec[kk] = 0;
+		}
+
+		double square_mag = 0;
+		if( cfg->extended )
+		{
+			// 128-bin descriptor
+			for( i = 0; i < 4; i++ )
+			{
+				for( j = 0; j < 4; j++ )
+				{
+					for(y = i*5; y < i*5+5; y++ )
+					{
+						for(x = j*5; x < j*5+5; x++ )
+						{
+							float tx = DX[y][x], ty = DY[y][x];
+							if( ty >= 0 )
+							{
+								vec[0] += tx;
+								vec[1] += (float)fabs(tx);
+							} else {
+								vec[2] += tx;
+								vec[3] += (float)fabs(tx);
+							}
+							if ( tx >= 0 )
+							{
+								vec[4] += ty;
+								vec[5] += (float)fabs(ty);
+							} else {
+								vec[6] += ty;
+								vec[7] += (float)fabs(ty);
+							}
+						}
+					}
+					for( kk = 0; kk < 8; kk++ )
+					{
+						square_mag += vec[kk]*vec[kk];
+					}
+					vec += 8;
+				}
+			}
+		}
+		else
+		{
+			// 64-bin descriptor
+			for( i = 0; i < 4; i++ )
+			{
+				for( j = 0; j < 4; j++ )
+				{
+					for(y = i*5; y < i*5+5; y++ )
+					{
+						for(x = j*5; x < j*5+5; x++ )
+						{
+							float tx = DX[y][x], ty = DY[y][x];
+							vec[0] += tx; vec[1] += ty;
+							vec[2] += (float)fabs(tx); vec[3] += (float)fabs(ty);
+						}
+					}
+					for( kk = 0; kk < 4; kk++ )
+					{
+						square_mag += vec[kk]*vec[kk];
+					}
+					vec+=4;
+				}
+			}
+		}
 	}
 
 
@@ -857,72 +938,13 @@ cleanup:
 	destructVector(&apt);
 
 	return ret;
-
-
-	
-#if 0
-	int i, j, N = (int)keypoints.size();
-	if( N > 0 )
-	{
-		Mat descriptors;
-		bool _1d = false;
-		int dcols = extended ? 128 : 64;
-		size_t dsize = dcols*sizeof(float);
-
-		if( doDescriptors )
-		{
-			_1d = _descriptors.kind() == _InputArray::STD_VECTOR && _descriptors.type() == CV_32F;
-			if( _1d )
-			{
-				_descriptors.create(N*dcols, 1, CV_32F);
-				descriptors = _descriptors.getMat().reshape(1, N);
-			}
-			else
-			{
-				_descriptors.create(N, dcols, CV_32F);
-				descriptors = _descriptors.getMat();
-			}
-		}
-
-		// we call SURFInvoker in any case, even if we do not need descriptors,
-		// since it computes orientation of each feature.
-		parallel_for_(Range(0, N), SURFInvoker(img, sum, keypoints, descriptors, extended, upright) );
-
-		// remove keypoints that were marked for deletion
-		for( i = j = 0; i < N; i++ )
-		{
-			if( keypoints[i].size > 0 )
-			{
-				if( i > j )
-				{
-					keypoints[j] = keypoints[i];
-					if( doDescriptors )
-						memcpy( descriptors.ptr(j), descriptors.ptr(i), dsize);
-				}
-				j++;
-			}
-		}
-		if( N > j )
-		{
-			N = j;
-			keypoints.resize(N);
-			if( doDescriptors )
-			{
-				Mat d = descriptors.rowRange(0, N);
-				if( _1d )
-					d = d.reshape(1, N*dcols);
-				d.copyTo(_descriptors);
-			}
-		}
-	}
-#endif
 }
 
 int surfFeatureDetectAndCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 {
 	int ret = PANORAMA_OK;
-	Mat srcImg;
-	Mat sumImg;
+	Mat *srcImg = NULL;
+	Mat *sumImg = NULL;
 
 	if (!cfg || !img)
 	{
@@ -950,8 +972,10 @@ int surfFeatureDetectAndCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpd
 		goto out;
 	}
 
-	integral (&srcImg, &sumImg);
-	fastHessianDetector(&sumImg, &sumImg, kp, cfg->nOctaves, cfg->nOctaveLayers, (float)cfg->hessianThreshold);
+	integral (srcImg, sumImg);
+	fastHessianDetector(sumImg, sumImg, kp, cfg->nOctaves, cfg->nOctaveLayers, (float)cfg->hessianThreshold);
+
+	surfFeatureCompute(cfg, img, kp, kpdes);
 
 out:
 	destructMat(&srcImg);

@@ -4,6 +4,7 @@
 #include <math.h>
 #include "utils.h"
 #include "matrix.h"
+#include "vector.h"
 
 #define MAX_KEYPOINTS_NUM 1000
 #define MAX_DESCRIPTOR_NUM 1000

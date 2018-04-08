@@ -5,6 +5,7 @@
 
 #include "log.h"
 #include "utils.h"
+#include "vector.h"
 #include "features2d.h"
 #include "matrix.h"
 #include "surf.h"
@@ -12,19 +13,27 @@
 
 #define MAX_IMAGE_NUM 12
 
-typedef struct FeaturesModule_S
+typedef struct FeaturesFinder_S
 {
 	void *cfg;
 	int (*detect)(void *cfg, Image *img, Vector *kp);
 	int (*compute)(void *cfg, Image *img, Vector *kp, Mat **kpdes);
 	int (*detectAndCompute)(void *cfg, Image *img, Vector *kp, Mat **kpdes);
-} FeaturesModule;
+} FeaturesFinder;
+
+typedef struct FeaturesMatcher_S
+{
+	int (*match)();
+} FeaturesMatcher;
+
 
 typedef struct PANORAMA_INNER_CTX_S
 {
 	int imgNum;
 
-	FeaturesModule featureMod;
+	FeaturesFinder featureFinder;
+
+	FeaturesMatcher matcher;
 
 	Image images[MAX_IMAGE_NUM];
 

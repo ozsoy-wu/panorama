@@ -10,9 +10,6 @@
 #define PANORAMA_2PI  6.283185307179586476925286766559
 #define PANORAMA_LOG2 0.69314718055994530941723212145818
 
-#define SELF_NEED_FREE_MASK 0x1
-#define DATA_NEED_FREE_MASK 0x2
-
 //#define GET_BIT(v, bitmask) ((v)&(bitmask))
 //#define SET_BIT(v, bitmask) ((v)|(bitmask))
 
@@ -36,26 +33,5 @@
 #else
 #define PRINT(type, pEntity)
 #endif
-
-#define DEF_VECTOR_INIT_CAPACITY 8
-#define MAX_VECTOR_CAPACITY 2048
-
-typedef struct Vector_S
-{
-	int selfNeedFree;
-	int dataNeedFree;
-	int size;	/* 当前有效数据大小 */
-	int capacity;	/* vector容量，如果容量不足以容纳更多数据则二倍增长当前容量 */
-	int elemSize;	/* 每个元素大小，字节单位 */
-	void *elemArray;	/* 存储元素位置 */
-} Vector;
-
-#define VECTOR_AT(vecPtr, idx) ((unsigned char *)((vecPtr)->elemArray) + (vecPtr)->elemSize * (idx))
-
-int constructVector(Vector **vPtrIn, int elemSize, int capacity);
-unsigned char *vectorGetAndReserveTail(Vector *vPtr);
-unsigned char *vectorPop(Vector *vPtr);
-int vectorResize(Vector *vPtr, int newCapa);
-int destructVector(Vector **vPtr);
 
 #endif // __PANORAMA_UTILS_H__

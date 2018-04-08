@@ -46,10 +46,10 @@ PANORAMA_CTX * PanoramaInit()
 	surfCfg->extended = 0;
 	surfCfg->upright = 0;
 
-	innerCtx->featureMod.cfg = (void *)surfCfg;
-	innerCtx->featureMod.detect = surfFeatureDetect;
-	innerCtx->featureMod.compute= surfFeatureCompute;
-	innerCtx->featureMod.detectAndCompute = surfFeatureDetectAndCompute;
+	innerCtx->featureFinder.cfg = (void *)surfCfg;
+	innerCtx->featureFinder.detect = surfFeatureDetect;
+	innerCtx->featureFinder.compute= surfFeatureCompute;
+	innerCtx->featureFinder.detectAndCompute = surfFeatureDetectAndCompute;
 
 	TAILQ_INIT(&innerCtx->imageQueue); // TODO
 
@@ -219,7 +219,7 @@ int PanoramaProcess (PANORAMA_CTX *ctx)
 
 	PANORAMA_INNER_CTX *inCtx = GET_INNER_CTX(ctx);
 	Vector *kpVecPtr[MAX_IMAGE_NUM] = {NULL};
-	Vector *kpdesVecPtr[MAX_IMAGE_NUM] = {NULL};
+	Mat *kpdesVecPtr[MAX_IMAGE_NUM] = {NULL};
 
 	// int surfFeatureDetectAndCompute(SURF_CFG *cfg, Image *img, KeyPoint *kp, KeyPointDescriptor* kpdes)
 	for (i = 0; i < inCtx->imgNum; i++)
@@ -233,16 +233,7 @@ int PanoramaProcess (PANORAMA_CTX *ctx)
 			return PANORAMA_ERROR;
 		}
 
-		ret = constructVector(&kpdesVecPtr[i], sizeof(KeyPointDescriptor), -1);
-		if (PANORAMA_ERROR == ret)
-		{
-			// TODO clean vector
-			
-			Log(LOG_ERROR, "construct descriptor vector failed\n");
-			return PANORAMA_ERROR;
-		}
-
-		inCtx->featureMod.detectAndCompute(inCtx->featureMod.cfg, &inCtx->images[i], kpVecPtr[i], kpdesVecPtr[i]);
+		inCtx->featureFinder.detectAndCompute(inCtx->featureFinder.cfg, &inCtx->images[i], kpVecPtr[i], &kpdesVecPtr[i]);
 	}
 
 #ifdef DEBUG_FUNC
@@ -250,9 +241,19 @@ int PanoramaProcess (PANORAMA_CTX *ctx)
 	{
 		Log(LOG_DEBUG, "image#%d: keypointsCnt:%d\n", i, kpVecPtr[i]->size);
 	}
+	for (i = 0; i < inCtx->imgNum; i++)
+	{
+		Log(LOG_DEBUG, "image#%d: keypoints descriptor, cnt:%d, dimension:%d\n", i, kpdesVecPtr[i]->rows, kpdesVecPtr[i]->cols);
+	}
+	
 #endif
 
-	// TODO clean vector
+	for (i = 0; i < inCtx->imgNum; i++)
+	{
+		destructVector(&kpVecPtr[i]);
+		destructMat(&kpdesVecPtr[i]);
+	}
+
 	return PANORAMA_PROCESS_FINISH;
 }
 

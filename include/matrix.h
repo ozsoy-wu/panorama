@@ -7,6 +7,14 @@
 //typedef (unsigned char) dataType;
 #define dataType char
 
+typedef enum RESIZE_INTERPOLATION_METHOD {
+	INTER_NEAREST = 0,
+	INTER_LINEAR,
+	INTER_AREA,
+	INTER_CUBIC,
+	INTER_LANCZOS4
+} INTERPOLATION_METHOD;
+
 typedef struct Image_S
 {
 	int w;				/* Í¼Æ¬·Ö±æÂÊ¿í¶È*/
@@ -44,9 +52,9 @@ typedef struct Matrix_S
 
 int integral(Mat *src, Mat *sum);
 
-int constructMat(Mat *matPtr, int cols, int rows, int channel, int elemSize1, unsigned char *dataPtr);
-int destructMat(Mat *matPtr);
-int resizeMat();
+int constructMat(Mat **matPtr, int cols, int rows, int channel, int elemSize1, unsigned char *dataPtr);
+int destructMat(Mat **matPtr);
+int resizeMat(Mat *src, Mat *dst, double fx, double fy, INTERPOLATION_METHOD method);
 
 
 

@@ -19,6 +19,7 @@ _OBJS += main.o
 _OBJS += features2d.o
 _OBJS += imgcodec.o
 _OBJS += matrix.o
+_OBJS += vector.o
 _OBJS += utils.o
 _OBJS += log.o
 _OBJS += surf.o

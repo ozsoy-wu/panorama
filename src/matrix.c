@@ -28,79 +28,128 @@ void printMatrix(void *entity)
 }
 #endif
 
-int constructMat(Mat *matPtr, int cols, int rows, int channel, int elemSize1, unsigned char *dataPtr)
+int constructMat(Mat **matPtr, int cols, int rows, int channel, int elemSize1, unsigned char *dataPtr)
 {
 	if (!matPtr)
 	{
-		matPtr = tMalloc(Mat);
-		if (!matPtr)
+		return PANORAMA_ERROR;
+	}
+
+	if (!(*matPtr))
+	{
+		*matPtr = tMalloc(Mat);
+		if (!*matPtr)
 		{
 			return PANORAMA_ERROR;
 		}
-		memset(matPtr, 0, sizeof(Mat));
-		matPtr->selfNeedFree = 1;
+		memset(*matPtr, 0, sizeof(Mat));
+		(*matPtr)->selfNeedFree = 1;
 	}
 	else
 	{
-		matPtr->selfNeedFree = 0;
+		(*matPtr)->selfNeedFree = 0;
 	}
 
-	matPtr->cols = cols;
-	matPtr->rows = rows;
-	matPtr->channel = channel;
-	matPtr->elemSize1 = elemSize1;
-	matPtr->elemSize = elemSize1 * channel;
-	matPtr->step = elemSize1 * channel * cols;
-	matPtr->totalSize = matPtr->step * rows;
+	(*matPtr)->cols = cols;
+	(*matPtr)->rows = rows;
+	(*matPtr)->channel = channel;
+	(*matPtr)->elemSize1 = elemSize1;
+	(*matPtr)->elemSize = elemSize1 * channel;
+	(*matPtr)->step = elemSize1 * channel * cols;
+	(*matPtr)->totalSize = (*matPtr)->step * rows;
 
 #ifdef DEBUG_FUNC
-	matPtr->print = printMatrix;
+	(*matPtr)->print = printMatrix;
 #endif
 
 	if (!dataPtr)
 	{
-		matPtr->data = lMalloc(unsigned char, matPtr->totalSize);
-		if (matPtr->data == NULL)
+		(*matPtr)->data = lMalloc(unsigned char, (*matPtr)->totalSize);
+		if ((*matPtr)->data == NULL)
 		{
-			if (matPtr->selfNeedFree)
+			if ((*matPtr)->selfNeedFree)
 			{
-				matPtr->selfNeedFree = 0;
-				FREE(matPtr);
+				(*matPtr)->selfNeedFree = 0;
+				FREE(*matPtr);
 			}
 			return PANORAMA_ERROR;
 		}
-		memset(matPtr->data, 0 , matPtr->totalSize);
-		matPtr->dataNeedFreeByMat = 1;
+		memset((*matPtr)->data, 0 , (*matPtr)->totalSize);
+		(*matPtr)->dataNeedFreeByMat = 1;
 	}
 	else
 	{
-		matPtr->data = dataPtr;
-		matPtr->dataNeedFreeByMat = 0;
+		(*matPtr)->data = dataPtr;
+		(*matPtr)->dataNeedFreeByMat = 0;
 	}
 
 	return PANORAMA_OK;
 }
 
-int destructMat(Mat *matPtr)
+int destructMat(Mat **matPtr)
 {
-	if (matPtr)
+	if (matPtr && *matPtr)
 	{
-		if (matPtr->dataNeedFreeByMat)
+		if ((*matPtr)->dataNeedFreeByMat)
 		{
-			FREE(matPtr->data);
+			FREE((*matPtr)->data);
 		}
-		if (matPtr->selfNeedFree)
+		if ((*matPtr)->selfNeedFree)
 		{
-			FREE(matPtr);
+			FREE(*matPtr);
+			*matPtr = NULL;
 		}
 	}
 
 	return PANORAMA_OK;
 }
 
-int resizeMat()
+int resizeMat(Mat *src, Mat *dst, double fx, double fy, INTERPOLATION_METHOD method)
 {
+	if (!src || !dst || !src->data || !dst->data)
+	{
+		return PANORAMA_ERROR;
+	}
 
+	if (INTER_NEAREST == method)
+	{
+		int sx, sy, xOfSrc;
+		int y, x, pix_size = src->elemSize;
+		unsigned char *D = NULL;
+		unsigned char *S = NULL;
+		double ifx = 1./fx;
+		double ify = 1./fy;
+
+		for (y = 0; y < dst->rows; y++)
+		{
+			D = (unsigned char *)MAT_ROW_PTR(dst, y);
+			sy = MIN(floor(y*ify), src->rows - 1);
+			S = (unsigned char *)MAT_ROW_PTR(src, y);
+
+			switch (pix_size)
+			{
+			case 1:
+				for( x = 0; x <= dst->cols - 2; x += 2 )
+				{
+					sx = (int)floor(x * ifx);
+					xOfSrc = MIN(sx, src->cols - 1) * pix_size;
+					D[x] = S[xOfSrc];
+
+					sx = floor((x + 1) * ifx);
+					xOfSrc = MIN(sx, src->cols - 1) * pix_size;
+					D[x+1] = S[xOfSrc];
+				}
+
+				for( ; x < dst->cols; x++ )
+				{
+					sx = floor(x * ifx);
+					xOfSrc = MIN(sx, src->cols - 1) * pix_size;
+					D[x] = S[xOfSrc];
+				}
+				break;
+			}
+		}
+	}
 	return PANORAMA_OK;
 
 }
