@@ -5,7 +5,7 @@
 
 #define PANO_W 600
 #define PANO_H 240
-#define IMG_NUM 2
+#define IMG_NUM 12
 
 int main(int argc, char **argv)
 {
@@ -13,6 +13,37 @@ int main(int argc, char **argv)
 	int ret = PANORAMA_OK;
 	IMG_FORMAT panoFmt;
 	char *pano = NULL; 
+	char *imgName[IMG_NUM] = {
+		"/home/pg/w/yuv_from_bmp/11.bmp.yuv",
+		"/home/pg/w/yuv_from_bmp/10.bmp.yuv",
+		"/home/pg/w/yuv_from_bmp/9.bmp.yuv",
+		"/home/pg/w/yuv_from_bmp/8.bmp.yuv",
+		"/home/pg/w/yuv_from_bmp/7.bmp.yuv",
+		"/home/pg/w/yuv_from_bmp/6.bmp.yuv",
+		"/home/pg/w/yuv_from_bmp/5.bmp.yuv",
+		"/home/pg/w/yuv_from_bmp/4.bmp.yuv",
+		"/home/pg/w/yuv_from_bmp/3.bmp.yuv",
+		"/home/pg/w/yuv_from_bmp/2.bmp.yuv",
+		"/home/pg/w/yuv_from_bmp/1.bmp.yuv",
+		"/home/pg/w/yuv_from_bmp/0.bmp.yuv",
+		};
+#if 0
+	char *imgName[IMG_NUM] = {
+		"/home/pg/w/11.yuv",
+		"/home/pg/w/10.yuv",
+		"/home/pg/w/9.yuv",
+		"/home/pg/w/8.yuv",
+		"/home/pg/w/7.yuv",
+		"/home/pg/w/6.yuv",
+		"/home/pg/w/5.yuv",
+		"/home/pg/w/4.yuv",
+		"/home/pg/w/3.yuv",
+		"/home/pg/w/2.yuv",
+		"/home/pg/w/1.yuv",
+		"/home/pg/w/0.yuv",
+		};
+#endif
+#if 0
 	char *imgName[IMG_NUM] = {
 		"/home/pg/w/1.yuv",
 		"/home/pg/w/0.yuv",
@@ -28,6 +59,7 @@ int main(int argc, char **argv)
 		"/home/pg/w/10.yuv",
 		"/home/pg/w/11.yuv",
 	};*/
+#endif
 	PANORAMA_CTX *ctx = NULL;
 	PANORAMA_CFG cfg;
 
