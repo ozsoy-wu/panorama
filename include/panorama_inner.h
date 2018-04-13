@@ -39,6 +39,12 @@ typedef struct PANORAMA_INNER_CTX_S
 
 	FeaturesMatcher matcher;
 
+	float yAngleOffset;	/* 镜头y轴偏移水平线角度，向上偏移取正值，向下偏移取负值 */
+	float viewingAngle;	/* 镜头视场角 */
+	float rotateAngle;	/* 相邻两张图片之间的转动角度 */
+	float focalLength;	/* 镜头焦距 */
+	int overlapWidth;	/* 镜头y轴偏移为0的情况下，相邻两张图片的重合宽度，像素单位 */
+
 	Image images[MAX_IMAGE_NUM];
 
 	TAILQ_HEAD(, Image_S) imageQueue;

@@ -2,7 +2,7 @@
 
 #include "stitch.h"
 
-#define onlytwo
+//#define onlytwo
 
 int stitch(PANORAMA_INNER_CTX *innerCtx)
 {
@@ -39,7 +39,7 @@ int stitch(PANORAMA_INNER_CTX *innerCtx)
 	unsigned char *dup = NULL;
 	unsigned char *dvp = NULL;
 	int curTotalW = 0;
-	int lastOverlapEnd = 0;
+
 	for (i = 0; i <innerCtx->imgNum; i++)
 	{
 		int curw = innerCtx->images[i].w;
@@ -49,15 +49,12 @@ int stitch(PANORAMA_INNER_CTX *innerCtx)
 		
 		dyp = 0;
 
+		// Y
 		for (j = 0; j < innerCtx->images[i].h; j++)
 		{
 			syp = (unsigned char*)innerCtx->images[i].data[0] + j * innerCtx->images[i].w;
-			sup = (unsigned char*)innerCtx->images[i].data[0] + curys + j * (innerCtx->images[i].w / 4);
-			svp = (unsigned char*)innerCtx->images[i].data[0] + curys + curuvs + j * (innerCtx->images[i].w / 4);
 
 			dyp = buf + j * tw + curTotalW;
-			dup = buf + ySize + j * tw / 4 + curTotalW / 4;
-			dvp = buf + ySize + uSize + j * tw / 4 +curTotalW / 4;
 
 			if (i == 0)
 			{
@@ -82,44 +79,76 @@ int stitch(PANORAMA_INNER_CTX *innerCtx)
 					{
 						dyp[k] = syp[k];
 					}
+				}
+			}
+		}
 
-					if (j%2==0 && k%4 == 0)
+		// UV
+		for (j = 0; j < innerCtx->images[i].h; j++)
+		{
+			if (j % 2 == 1)
+			{
+				continue;
+			}
+			sup = (unsigned char*)innerCtx->images[i].data[0] + curys + (j/2) * (innerCtx->images[i].w / 2);
+			svp = (unsigned char*)innerCtx->images[i].data[0] + curys + curuvs + (j/2) * (innerCtx->images[i].w / 2);
+
+			dup = buf + ySize + (j/2) * (tw/2) + curTotalW / 2;
+			dvp = buf + ySize + uSize + (j/2) * (tw/2) +curTotalW / 2;
+
+			if (i == 0)
+			{
+				for (k = 0; k < innerCtx->images[i].w; k++)
+				{
+					if (k%2 == 1)
 					{
-						int uvidx = k/4;
+						continue;
+					}
+
+					int uvidx = k/2;
+					dup[uvidx] = sup[uvidx];
+					dvp[uvidx] = svp[uvidx];
+				}
+			}
+			else
+			{
+				for (k = 0; k < innerCtx->images[i].w; k++)
+				{
+					if (k%2 == 1)
+					{
+						continue;
+					}
+
+					int uvidx = k/2;
 
 #ifdef onlytwo
-						if (i >= 2 && k < (2 * overlap - innerCtx->images[i].w))
-						{
-							// do nothing
-						}
-						else 
+					if (i >= 2 && k < (2 * overlap - innerCtx->images[i].w))
+					{
+						// do nothing
+					}
+					else 
 #endif
-						if (k < overlap)
-						{
-							dup[uvidx] = sup[uvidx] * k/overlap +dup[uvidx] *(overlap - k) / overlap;
-							dvp[uvidx] = svp[uvidx] * k/overlap +dvp[uvidx] *(overlap - k) / overlap;
-						}
-						else
-						{
-							dvp[uvidx] = svp[uvidx];
-						}
+					if (k < overlap)
+					{
+						dup[uvidx] = sup[uvidx] * k/overlap +dup[uvidx] *(overlap - k) / overlap;
+						dvp[uvidx] = svp[uvidx] * k/overlap +dvp[uvidx] *(overlap - k) / overlap;
+					}
+					else
+					{	leaveCnt++;
+						dup[uvidx] = sup[uvidx];
+						dvp[uvidx] = svp[uvidx];
 					}
 				}
 			}
-			/*
-			memcpy(dyp, syp, curw);
-			*/
-			memcpy(dup, sup , curw / 4);
-			memcpy(dvp, svp, curw / 4);
 		}
+
+		
 
 		curTotalW += innerCtx->images[i].w;
 		curTotalW -= overlap;
-		lastOverlapEnd = innerCtx->images[i].w * (i - 1) + overlap * (i - 2);
-		lastOverlapEnd = lastOverlapEnd < 0 ? 0 : lastOverlapEnd;
 	}
 
-	system("rm /home/pg/w/opencv-result/combine.yuv");
+	system("rm -rf /home/pg/w/opencv-result/combine.yuv");
 	FILE *fp = fopen("/home/pg/w/opencv-result/combine.yuv", "w+");
 	if (!fp)
 	{

@@ -41,9 +41,9 @@ PANORAMA_CTX * PanoramaInit()
 	}
 	memset((void *)surfCfg, 0, sizeof(SURF_CFG));
 
-	surfCfg->hessianThreshold = 500;
-	surfCfg->nOctaves = 4;
-	surfCfg->nOctaveLayers = 3;
+	surfCfg->hessianThreshold = 300;
+	surfCfg->nOctaves = 3;
+	surfCfg->nOctaveLayers = 4;
 	surfCfg->extended = 0;
 	surfCfg->upright = 0;
 
@@ -247,22 +247,33 @@ int PanoramaProcess (PANORAMA_CTX *ctx)
 	}
 
 #ifdef DEBUG_FUNC
+	
+	KeyPoint *ckp = NULL;
+	int j;
+
+/*
 	for (i = 0; i < inCtx->imgNum; i++)
 	{
-		int j;
-		KeyPoint *curkp = NULL;
-		Log(LOG_DEBUG, "image#%d: keypointsCnt:%d\n", i, inCtx->kpVecPtr[i]->size);
+		printf("image#%d:+++++++++++++++++feature points cnt:%d+++++++++++++++++\n", i, inCtx->kpVecPtr[i]->size);
 		for (j = 0; j < inCtx->kpVecPtr[i]->size; j++)
 		{
-			curkp = (KeyPoint *)VECTOR_AT(inCtx->kpVecPtr[i], j);
-			//printf("[%f, %f]\n", curkp->pt.x, curkp->pt.y);
+			ckp = (KeyPoint *)VECTOR_AT(inCtx->kpVecPtr[i], j);
+			printf("kp%d:[%f,%f], size=%f, angle=%f, response=%f, octave=%d, classId=%d\n",
+				   j,
+				   ckp->pt.x, ckp->pt.y,
+				   ckp->size, ckp->angle,
+				   ckp->response, ckp->octave,
+				   ckp->classId);
 		}
 	}
+
+
 	for (i = 0; i < inCtx->imgNum; i++)
 	{
 		Log(LOG_DEBUG, "image#%d: keypoints descriptor, cnt:%d, dimension:%d\n", i, inCtx->kpdesVecPtr[i]->rows, inCtx->kpdesVecPtr[i]->cols);
 		//PRINT(Mat, inCtx->kpdesVecPtr[i]);
 	}
+	*/
 #endif
 
 	ret = knnMatcher();

@@ -973,6 +973,8 @@ int surfFeatureDetectAndCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpd
 	}
 
 	integral (srcImg, sumImg);
+	//PRINT(Mat, srcImg);
+	//PRINT(Mat, sumImg);
 	fastHessianDetector(sumImg, sumImg, kp, cfg->nOctaves, cfg->nOctaveLayers, (float)cfg->hessianThreshold);
 
 	surfFeatureCompute(cfg, img, kp, kpdes);
