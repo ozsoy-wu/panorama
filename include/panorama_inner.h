@@ -11,8 +11,12 @@
 #include "surf.h"
 #include "features_match.h"
 
-
 #define MAX_IMAGE_NUM 12
+
+typedef enum INNER_STATUS_E {
+	INIT = 0,
+	PROCESS,
+} INNER_STATUS;
 
 typedef struct FeaturesFinder_S
 {
@@ -27,29 +31,22 @@ typedef struct FeaturesMatcher_S
 	int (*match)();
 } FeaturesMatcher;
 
-
 typedef struct PANORAMA_INNER_CTX_S
 {
-	int imgNum;
+	int imgNum;	/* 当前已装载的图片数量 */
+	int imgToBeHandle; /* 待处理的图片编号，以0开始 */
+	INNER_STATUS status;
 
-	Vector *kpVecPtr[MAX_IMAGE_NUM];
-	Mat *kpdesVecPtr[MAX_IMAGE_NUM];
+	PANORAMA_CFG cfg;
+	Image images[MAX_IMAGE_NUM];	/* 原始图片数据 */
+	Image pano;	/* 全景图 */
+
+	Vector *kpVecPtr[MAX_IMAGE_NUM];	/* 每张图片的特征点 */
+	Mat *kpdesVecPtr[MAX_IMAGE_NUM];	/* 每张图片的特征点描述向量 */
 
 	FeaturesFinder featureFinder;
-
 	FeaturesMatcher matcher;
-
-	float yAngleOffset;	/* 镜头y轴偏移水平线角度，向上偏移取正值，向下偏移取负值 */
-	float viewingAngle;	/* 镜头视场角 */
-	float rotateAngle;	/* 相邻两张图片之间的转动角度 */
-	float focalLength;	/* 镜头焦距 */
-	int overlapWidth;	/* 镜头y轴偏移为0的情况下，相邻两张图片的重合宽度，像素单位 */
-
-	Image images[MAX_IMAGE_NUM];
-
-	TAILQ_HEAD(, Image_S) imageQueue;
 } PANORAMA_INNER_CTX;
-
 
 /* 获取内部contex指针 */
 #define GET_INNER_CTX(ctx) ((PANORAMA_INNER_CTX *)((ctx)->innerCtx))

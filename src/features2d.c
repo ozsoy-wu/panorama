@@ -4,7 +4,7 @@
 #include "features2d.h"
 #include "utils.h"
 
-float overlap(KeyPoint *kp1, KeyPoint *kp2 )
+float pointOverlap(KeyPoint *kp1, KeyPoint *kp2 )
 {
 	float a = kp1->size * 0.5f;
 	float b = kp2->size * 0.5f;

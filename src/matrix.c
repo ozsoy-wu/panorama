@@ -28,6 +28,162 @@ void printMatrix(void *entity)
 }
 #endif
 
+int constructImage(Image **imgPtr, char **buf, int *bufSize, int bufCnt,
+	int imgWidth, int imgHeight, IMG_FORMAT format, int bufType)
+{
+	int i;
+	int okIdx = -1;
+	int imgSize = 0;
+	unsigned char *newP = NULL;
+
+	if (!imgPtr)
+	{
+		return PANORAMA_ERROR;
+	}
+
+	if (!(*imgPtr))
+	{
+		*imgPtr = tMalloc(Image);
+		if (!*imgPtr)
+		{
+			return PANORAMA_ERROR;
+		}
+		memset(*imgPtr, 0, sizeof(Image));
+		(*imgPtr)->selfNeedFree = 1;
+	}
+	else
+	{
+		(*imgPtr)->selfNeedFree = 0;
+	}
+
+
+	(*imgPtr)->w = imgWidth;
+	(*imgPtr)->h = imgHeight;
+	(*imgPtr)->imgFmt = format;
+
+	if (BUF_TYPE_COPY_NODELETE == bufType)
+	{
+		(*imgPtr)->dataNeedFree = 1;
+		(*imgPtr)->dataBlocks = bufCnt;
+
+		for (i = 0; i < bufCnt; i++)
+		{
+			if (!buf[i] || bufSize[i] <= 0)
+			{
+				goto err;
+			}
+
+			(*imgPtr)->dataSize[i] = bufSize[i];
+			(*imgPtr)->data[i] = NULL;
+			newP = (unsigned char *)lMalloc(unsigned char, bufSize[i]);
+			if (!newP)
+			{
+				goto err;
+			}
+			memset(newP, 0, bufSize[i]);
+			memcpy(newP, buf[i], bufSize[i]);
+
+			(*imgPtr)->data[i] = newP;
+			okIdx = i;
+		}
+	}
+	else if (BUF_TYPE_NOCOPY_NODELETE == bufType)
+	{
+		(*imgPtr)->dataNeedFree = 0;
+		(*imgPtr)->dataBlocks = bufCnt;
+		for (i = 0; i < bufCnt; i++)
+		{
+			(*imgPtr)->dataSize[i] = bufSize[i];
+			(*imgPtr)->data[i] = (unsigned char *)buf[i];
+		}
+	}
+	else if (BUF_TYPE_NOCOPY_DELETE == bufType)
+	{
+		(*imgPtr)->dataNeedFree = 1;
+		(*imgPtr)->dataBlocks = bufCnt;
+		for (i = 0; i < bufCnt; i++)
+		{
+			(*imgPtr)->dataSize[i] = bufSize[i];
+			(*imgPtr)->data[i] = (unsigned char *)buf[i];
+		}
+	}
+	else if (BUF_TYPE_NOBUF == bufType)
+	{
+		(*imgPtr)->dataNeedFree = 1;
+		(*imgPtr)->dataBlocks = 1;
+
+		if (IMG_FMT_YUV420P_I420 == format ||
+			IMG_FMT_YUV420P_YV12 == format ||
+			IMG_FMT_YUV420SP_NV12 == format ||
+			IMG_FMT_YUV420SP_NV21 == format)
+		{
+			imgSize = imgWidth * imgHeight * 3 / 2;
+		}
+		else
+		{
+			imgSize = imgWidth * imgHeight;
+		}
+
+		newP = (unsigned char *)lMalloc(unsigned char, imgSize);
+		if (!newP)
+		{
+			goto err;
+		}
+		memset(newP, 0, imgSize);
+
+		(*imgPtr)->dataSize[0] = imgSize;
+		(*imgPtr)->data[0] = newP;
+	}
+
+	return PANORAMA_OK;
+
+err:
+
+	if ((*imgPtr))
+	{
+		if ((*imgPtr)->dataNeedFree)
+		{
+			for (i = 0; i <= okIdx; i++)
+			{
+				FREE((*imgPtr)->data[i]);
+			}
+			(*imgPtr)->dataNeedFree = 0;
+		}
+
+		if ((*imgPtr)->selfNeedFree)
+		{
+			FREE(*imgPtr);
+			(*imgPtr)->selfNeedFree = 0;
+		}
+	}
+
+	return PANORAMA_ERROR;
+}
+
+int destructImage(Image **imgPtr)
+{
+	int i;
+	if (imgPtr && *imgPtr)
+	{
+		if ((*imgPtr)->dataNeedFree)
+		{
+			for (i = 0; i < 3; i++)
+			{
+				FREE((*imgPtr)->data[i]);
+			}
+			(*imgPtr)->dataNeedFree = 0;
+		}
+
+		if ((*imgPtr)->selfNeedFree)
+		{
+			FREE(*imgPtr);
+			(*imgPtr)->selfNeedFree = 0;
+		}
+	}
+
+	return PANORAMA_OK;
+}
+
 int constructMat(Mat **matPtr, int cols, int rows, int channel, int elemSize1, unsigned char *dataPtr)
 {
 	if (!matPtr)
@@ -162,13 +318,12 @@ int resizeMat(Mat *src, Mat *dst, double fx, double fy, INTERPOLATION_METHOD met
 */
 int integral(Mat *src, Mat *sum)
 {
-	int i, j, dx, dy, srcW, srcH, dstW, dstH;
+	int i, j, dx, dy;
 	unsigned char *pSrc = NULL;
 	int *pDst = NULL;
 	int *pDst1 = NULL;
 	int *pDst2 = NULL;
 	int *pDst3 = NULL;
-	int tmp;
 
 	if (!src || !sum || !src->data || !sum->data)
 	{
@@ -177,10 +332,6 @@ int integral(Mat *src, Mat *sum)
 
 	pSrc = (unsigned char *)src->data;
 	pDst = (int *)sum->data;
-	srcW = src->cols;
-	srcH = src->rows;
-	dstW = sum->cols = src->cols + 1;
-	dstH = sum->rows = src->rows + 1;
 
 	memset(pDst, 0, sum->totalSize);
 

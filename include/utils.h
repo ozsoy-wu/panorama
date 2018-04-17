@@ -34,4 +34,6 @@
 #define PRINT(type, pEntity)
 #endif
 
+int cvRound( double value );
+
 #endif // __PANORAMA_UTILS_H__

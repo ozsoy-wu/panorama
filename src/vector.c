@@ -73,7 +73,7 @@ unsigned char *vectorGetAndReserveTail(Vector *vPtr)
 			}
 			memset((unsigned char *)vPtr->elemArray + oldSize,
 					0, newSize - oldSize);
-			(vPtr->capacity)<<1;
+			vPtr->capacity = (vPtr->capacity)<<1;
 		}
 		else
 		{
@@ -105,7 +105,6 @@ unsigned char *vectorPop(Vector *vPtr)
 int vectorResize(Vector *vPtr, int newCapa)
 {
 	int oldSize, newSize;
-	int oldCapa;
 
 	if (!vPtr)
 	{

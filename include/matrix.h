@@ -4,9 +4,6 @@
 #include <sys/queue.h>
 #include "panorama.h"
 
-//typedef (unsigned char) dataType;
-#define dataType char
-
 typedef enum RESIZE_INTERPOLATION_METHOD {
 	INTER_NEAREST = 0,
 	INTER_LINEAR,
@@ -15,18 +12,25 @@ typedef enum RESIZE_INTERPOLATION_METHOD {
 	INTER_LANCZOS4
 } INTERPOLATION_METHOD;
 
+typedef enum BUF_TYPE_E {
+	BUF_TYPE_COPY_DELETE = 0,
+	BUF_TYPE_COPY_NODELETE,
+	BUF_TYPE_NOCOPY_DELETE,
+	BUF_TYPE_NOCOPY_NODELETE,
+	BUF_TYPE_NOBUF
+} BUF_TYPE;
+
 typedef struct Image_S
 {
 	int w;				/* 图片分辨率宽度*/
 	int h;				/* 图片分辨率高度*/
 	int colorDeep;			/* 图片颜色深度 */
 	IMG_FORMAT imgFmt;	/* 图片格式*/
-	int needFree;			/* data指针是否需要由库释放 */
+	int selfNeedFree;	/* Image自身是否需要调用free释放 */
+	int dataNeedFree;	/* data指针是否需要由Image自身释放 */
 	int dataBlocks;		/* 图片内存块数量 */
 	int dataSize[3];			/* data指针数据大小*/
-	dataType *data[3];	/* data指针，指向图片数据*/
-
-	TAILQ_ENTRY(Image_S) entries;
+	unsigned char *data[3];	/* data指针，指向图片数据*/
 } Image;
 
 typedef struct Matrix_S
@@ -52,37 +56,12 @@ typedef struct Matrix_S
 
 int integral(Mat *src, Mat *sum);
 
+int constructImage(Image **imgPtr, char **buf, int *bufSize, int bufCnt,
+	int imgWidth, int imgHeight, IMG_FORMAT format, int copy);
+int destructImage(Image **imgPtr);
+
 int constructMat(Mat **matPtr, int cols, int rows, int channel, int elemSize1, unsigned char *dataPtr);
 int destructMat(Mat **matPtr);
 int resizeMat(Mat *src, Mat *dst, double fx, double fy, INTERPOLATION_METHOD method);
-
-
-
-/*
-#define NEW_MAT(matPtr, cols, rows, channel, elemSize, dataPtr) ({\
-	int ret = PANORAMA_OK;\
-	(matPtr)->cols=(cols);\
-	(matPtr)->rows=(rows);\
-	(matPtr)->channel=(channel);\
-	(matPtr)->elemSize=(elemSize);\
-	(matPtr)->step= (matPtr)->elemSize * (matPtr)->channel * (matPtr)->cols;\
-	(matPtr)->totalSize= (matPtr)->step * (matPtr)->rows;\
-	if (dataPtr) {\
-		(matPtr)->dataNeedFreeByMat = 0;\
-		(matPtr)->data = dataPtr;\
-	}\
-	else {\
-		(matPtr)->dataNeedFreeByMat = 1;\
-		(matPtr)->data = lMalloc(unsigned char, (matPtr)->totalSize)\
-		if ((matPtr)->data == NULL)\
-		{\
-			ret = PANORAMA_ERROR;\
-		}\
-	}\
-	ret;
-})
-
-#define FREE_MAT(matPtr)
-*/
 
 #endif // __PANORAMA_MATRIX_H__

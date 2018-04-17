@@ -9,7 +9,6 @@
 #define MAX_KEYPOINTS_NUM 1000
 #define MAX_DESCRIPTOR_NUM 1000
 
-
 typedef struct Point_S
 {
 	float x;
@@ -53,7 +52,7 @@ typedef Mat KeyPointDescriptor;
 	kp->octave = (octave);\
 	kp->classId = (classId);\
 } while(0)
-
+float pointOverlap(KeyPoint *kp1, KeyPoint *kp2 );
 int keypointAssignment(KeyPoint *kp, float x, float y, float size,
 		float angle, float response, int octave, int classId);
 int keypointVectorPush(Vector *vPtr, float x, float y, float size,
