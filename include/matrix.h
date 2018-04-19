@@ -24,12 +24,12 @@ typedef struct Image_S
 {
 	int w;				/* 图片分辨率宽度*/
 	int h;				/* 图片分辨率高度*/
-	int colorDeep;			/* 图片颜色深度 */
+	int colorDeep;		/* 图片颜色深度 */
 	IMG_FORMAT imgFmt;	/* 图片格式*/
 	int selfNeedFree;	/* Image自身是否需要调用free释放 */
 	int dataNeedFree;	/* data指针是否需要由Image自身释放 */
 	int dataBlocks;		/* 图片内存块数量 */
-	int dataSize[3];			/* data指针数据大小*/
+	int dataSize[3];		/* data指针数据大小*/
 	unsigned char *data[3];	/* data指针，指向图片数据*/
 } Image;
 
@@ -45,10 +45,6 @@ typedef struct Matrix_S
 	int selfNeedFree;	/* Mat自身是否需要调用free释放 */
 	int dataNeedFreeByMat;	/* data指针是否需要由Mat自身释放 */
 	unsigned char *data; // TODO 图片
-
-#ifdef DEBUG_FUNC
-	void (* print)(void *entity);
-#endif
 } Mat;
 
 #define MAT_ROW_PTR(matPtr, row) ((unsigned char *)((matPtr)->data) + ((row) * (matPtr)->step))

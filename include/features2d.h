@@ -57,4 +57,8 @@ int keypointAssignment(KeyPoint *kp, float x, float y, float size,
 		float angle, float response, int octave, int classId);
 int keypointVectorPush(Vector *vPtr, float x, float y, float size,
 		float angle, float response, int octave, int classId);
+
+float calcK1();
+int undistort(float k, float k2, Image *src, Image *dst);
+
 #endif // __PANORAMA_FEATURES2D_H__

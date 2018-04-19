@@ -9,6 +9,87 @@
 static int ctxCnt = 0;
 int gLogMask;
 
+int srcImgWidth;				/* 原始图属性，宽度 */
+int srcImgHeight;				/* 原始图属性，高度 */
+IMG_FORMAT srcImageFmt; 		/* 原始图属性，格式 */
+
+static int _PanoramaCfgInit(PANORAMA_CFG *cfg)
+{
+	if (!cfg)
+	{
+		return PANORAMA_ERROR;
+	}
+
+	cfg->commonImgTotalNum = -1;
+	cfg->commonLogMask = LOG_DEBUG | LOG_INFO | LOG_WARN | LOG_ERROR | LOG_FATAL;
+	cfg->camYOffset = 0;
+	cfg->camViewingAngle = 0;
+	cfg->camRotateAngle = 0;
+	cfg->camFocalLength = 0;
+	cfg->stitchOverlapWidth = -1;
+	cfg->stitchInterpolationWidth = DEFAULT_STITCH_WIDTH;
+	cfg->srcImgWidth = -1;
+	cfg->srcImgHeight = -1;
+	cfg->srcImageFmt = IMG_FMT_YUV420P_I420;
+	cfg->panoImageWidth = -1;
+	cfg->panoImageHeight = -1;
+	cfg->panoImageFmt = IMG_FMT_YUV420P_I420;
+
+	gLogMask = cfg->commonLogMask;
+
+	return PANORAMA_OK;
+}
+
+static int _PanoramaCfgCheck(PANORAMA_CFG *cfg)
+{
+	float overlap = 0.;
+
+	if (!cfg)
+	{
+		return PANORAMA_ERROR;
+	}
+
+	/* 原始图像数量必须大于0 */
+	if (cfg->commonImgTotalNum <= 0)
+	{
+		Log(LOG_ERROR, "Invalid image numbers %d\n", cfg->commonImgTotalNum);
+		return PANORAMA_ERROR;
+	}
+
+	/* 如果cfg里提供的重合区域宽度参数非法，那么将从镜头参数及原始图宽度计算重合区域宽度 */
+	if (cfg->stitchOverlapWidth < 0)
+	{
+		if (FLOAT_EQUAL(cfg->camViewingAngle, 0) ||
+			FLOAT_EQUAL(cfg->camRotateAngle, 0) ||
+			cfg->srcImgWidth <= 0)
+		{
+			Log(LOG_ERROR, "Invalid camera arguments\n");
+			return PANORAMA_ERROR;
+		}
+
+		overlap = (cfg->srcImgWidth * (cfg->camViewingAngle - cfg->camRotateAngle)) / cfg->camViewingAngle;
+		cfg->stitchOverlapWidth = (int)overlap;
+
+		Dbg("va(%f), ra(%f), w(%d), overlap(%f)\n",
+			cfg->camViewingAngle,
+			cfg->camRotateAngle,
+			cfg->srcImgWidth,
+			overlap);
+
+		Log(LOG_DEBUG, "Calculate overlap width = %d\n", cfg->stitchOverlapWidth);
+	}
+
+	/* 线性插值区域宽度须小于重合区域宽度 */
+	if (cfg->stitchInterpolationWidth > cfg->stitchOverlapWidth)
+	{
+		Log(LOG_ERROR, "Interpolation width(%d) too large, should smaller than overlap width(%d)\n",
+			cfg->stitchInterpolationWidth, cfg->stitchOverlapWidth);
+		return PANORAMA_ERROR;
+	}
+
+	return PANORAMA_OK;
+}
+
 PANORAMA_CTX * PanoramaInit()
 {
 	PANORAMA_CTX *ctx = NULL;
@@ -35,18 +116,10 @@ PANORAMA_CTX * PanoramaInit()
 
 	innerCtx->imgNum = 0;
 	innerCtx->imgToBeHandle = 0;
-	innerCtx->status = INIT;
+	innerCtx->status = STATUS_PREPARE;
+	innerCtx->totalProcessPercent = 0;
 
-	innerCtx->cfg.yAngleOffset = 0;
-	innerCtx->cfg.viewingAngle = -1;
-	innerCtx->cfg.rotateAngle = -1;
-	innerCtx->cfg.focalLength = -1;
-	innerCtx->cfg.overlapWidth = -1;
-	innerCtx->cfg.stitchWidth = DEFAULT_STITCH_WIDTH;
-	innerCtx->cfg.imgTotalNum = -1;
-	innerCtx->cfg.outImageWidth = -1;
-	innerCtx->cfg.outImageHeight = -1;
-	innerCtx->cfg.outImageFmt = IMG_FMT_YUV420P_I420;
+	_PanoramaCfgInit(&innerCtx->cfg);
 
 	surfCfg = tMalloc(SURF_CFG);
 	if (!surfCfg)
@@ -105,14 +178,14 @@ int PanoramaSetCfg (PANORAMA_CTX *ctx, PANORAMA_CFG *cfg)
 	PANORAMA_INNER_CTX *inCtx = NULL;
 	inCtx = GET_INNER_CTX(ctx);
 
-	if (cfg->stitchWidth > cfg->overlapWidth)
+	if (PANORAMA_OK != _PanoramaCfgCheck(cfg))
 	{
-		Log(LOG_ERROR, "stitch width(%d) too large, should smaller than overlap width(%d)\n",
-			cfg->stitchWidth, cfg->overlapWidth);
+		Log(LOG_ERROR, "Cfg check failed\n");
 		return PANORAMA_ERROR;
 	}
 
 	memcpy(&inCtx->cfg, cfg, sizeof(PANORAMA_CFG));
+	gLogMask = cfg->commonLogMask;
 
 	return PANORAMA_OK;
 }
@@ -225,117 +298,165 @@ int PanoramaLoadSrcImgBuffer (PANORAMA_CTX *ctx, char **buf,
 
 int PanoramaProcess (PANORAMA_CTX *ctx)
 {
-	int i;
 	int ret;
 	int panoW, panoH;
+	int percent;
+	int currentStep = 0;
+	int totalStep = 0;
 	Image *img = NULL;
 	INNER_STATUS status;
 
 	if (!ctx)
 	{
 		Log(LOG_ERROR, "ctx NULL\n");
-		return PANORAMA_ERROR;
+		return PANORAMA_PROCESS_ERROR;
 	}
 
 	PANORAMA_INNER_CTX *inCtx = GET_INNER_CTX(ctx);
 
 	status = inCtx->status;
+
+	/* 获取当前图片处理进度 */
+	percent = GET_SINGLE_PERCENT(status);
+
+	/* 获取总进度 */
+	if (inCtx->imgToBeHandle > 0)
+	{
+		currentStep = (inCtx->imgToBeHandle) * STATUS_LAST;
+	}
+	currentStep += status;
+	totalStep = inCtx->cfg.commonImgTotalNum * STATUS_LAST;
+	inCtx->totalProcessPercent = 100 * currentStep / totalStep;
+
 	switch (status)
 	{
-		case INIT:
-			panoW = inCtx->images[0].w * inCtx->cfg.imgTotalNum;
-			panoW -= inCtx->cfg.overlapWidth * (inCtx->cfg.imgTotalNum - 1);
+		case STATUS_PREPARE:
+			if (PANORAMA_OK != _PanoramaCfgCheck(&inCtx->cfg))
+			{
+				Log(LOG_ERROR, "Cfg check failed\n");
+				ret = PANORAMA_PROCESS_ERROR;
+				goto out;
+			}
+			inCtx->status = STATUS_INIT;
+			break;
+		case STATUS_INIT:
+			panoW = inCtx->images[0].w * inCtx->cfg.commonImgTotalNum;
+			panoW -= inCtx->cfg.stitchOverlapWidth * (inCtx->cfg.commonImgTotalNum - 1);
 			panoH = inCtx->images[0].h;
 			img = &inCtx->pano;
 			ret = constructImage(&img, NULL, NULL, 0, panoW,
 				panoH, inCtx->images[0].imgFmt, BUF_TYPE_NOBUF);
-			inCtx->status = PROCESS;
+			if (PANORAMA_OK != ret)
+			{
+				Log(LOG_ERROR, "Construct panorama image failed\n");
+				ret = PANORAMA_PROCESS_ERROR;
+				goto out;
+			}
+			
+			inCtx->status = STATUS_NEW_IMAGE;
 			break;
-		case PROCESS:
+		case STATUS_NEW_IMAGE:
+			if (inCtx->imgToBeHandle >= inCtx->imgNum &&
+				inCtx->imgNum >= inCtx->cfg.commonImgTotalNum)
+			{
+				Log(LOG_INFO, "All %d images have been processed\n");
+				ret = PANORAMA_PROCESS_FINISH;
+				goto out;
+			}
+
+			if (inCtx->imgToBeHandle >= inCtx->imgNum)
+			{
+				Log(LOG_INFO, "Need more image\n");
+				ret = PANORAMA_PROCESS_FINISH;
+				goto out;
+			}
+#ifdef FEATURE_BASE
+			inCtx->status = STATUS_FEATURE_DETECT;
+			break;
+		case STATUS_FEATURE_DETECT:
+ 			ret = constructVector(&(inCtx->kpVecPtr[inCtx->imgToBeHandle]), sizeof(KeyPoint), -1);
+			if (PANORAMA_OK != ret)
+			{
+				Log(LOG_ERROR, "image#%d: construct keypoint vector failed\n", inCtx->imgToBeHandle);
+				ret = PANORAMA_PROCESS_ERROR;
+				goto out;
+			}
+
+			ret = inCtx->featureFinder.detect(
+				(SURF_CFG *)inCtx->featureFinder.cfg,
+				&inCtx->images[inCtx->imgToBeHandle],
+				inCtx->kpVecPtr[inCtx->imgToBeHandle]);
+			if (PANORAMA_OK != ret)
+			{
+				Log(LOG_ERROR, "image#%d: feature detect failed\n",
+					inCtx->imgToBeHandle);
+				ret = PANORAMA_PROCESS_ERROR;
+				goto out;
+			}
+			inCtx->status = STATUS_FEATURE_COMPUTE;
+			break;
+		case STATUS_FEATURE_COMPUTE:
+			ret = inCtx->featureFinder.compute(
+				(SURF_CFG *)inCtx->featureFinder.cfg,
+				&inCtx->images[inCtx->imgToBeHandle],
+				inCtx->kpVecPtr[inCtx->imgToBeHandle],
+				&inCtx->kpdesVecPtr[inCtx->imgToBeHandle]);
+			if (PANORAMA_OK != ret)
+			{
+				Log(LOG_ERROR, "image#%d: feature compute failed\n",
+					inCtx->imgToBeHandle);
+				ret = PANORAMA_PROCESS_ERROR;
+				goto out;
+			}
+			inCtx->status = STATUS_FEATURE_MATCH;
+			break;
+		case STATUS_FEATURE_MATCH:
+			ret = knnMatcher();
+			if (PANORAMA_OK != ret)
+			{
+				Log(LOG_ERROR, "feature match failed\n");
+				ret = PANORAMA_PROCESS_ERROR;
+				goto out;
+			}
+			inCtx->status = STATUS_STITCH;
+			break;
+#else
+			inCtx->status = STATUS_STITCH;
+			break;
+#endif
+		case STATUS_STITCH:
+			ret = stitch(inCtx, inCtx->imgToBeHandle);
+			if (PANORAMA_OK != ret)
+			{
+				Log(LOG_ERROR, "image#%d stitch failed\n", inCtx->imgToBeHandle);
+				ret = PANORAMA_PROCESS_ERROR;
+				goto out;
+			}
+
+			/* 更新待处理图片下标 */
+			inCtx->imgToBeHandle++;
+			percent = PANORAMA_PROCESS_FINISH;
+
+			if (inCtx->imgToBeHandle >= inCtx->cfg.commonImgTotalNum)
+			{
+				inCtx->totalProcessPercent = PANORAMA_PROCESS_FINISH;
+				inCtx->status = STATUS_LAST;
+			}
+			else
+			{
+				inCtx->status = STATUS_NEW_IMAGE;
+			}
+
+			break;
+		case STATUS_LAST:
+			Log(LOG_INFO, "All %d images have been processed\n", inCtx->cfg.commonImgTotalNum);
+			inCtx->totalProcessPercent = PANORAMA_PROCESS_FINISH;
+			percent = PANORAMA_PROCESS_FINISH;
 			break;
 	}
 
-#if 0
-	for (i = inCtx->imgToBeHandle; i < inCtx->imgNum; i++)
-	{
-		ret = constructVector(&(inCtx->kpVecPtr[i]), sizeof(KeyPoint), -1);
-		if (PANORAMA_OK != ret)
-		{
-			Log(LOG_ERROR, "image#%d: construct keypoint vector failed\n", i);
-			ret = PANORAMA_ERROR;
-			goto clean;
-		}
-
-		ret = inCtx->featureFinder.detectAndCompute(
-			inCtx->featureFinder.cfg,
-			&inCtx->images[i],
-			inCtx->kpVecPtr[i],
-			&(inCtx->kpdesVecPtr[i]));
-		if (PANORAMA_OK != ret)
-		{
-			Log(LOG_ERROR, "image#%d: feature detect and compute failed\n", i);
-			ret = PANORAMA_ERROR;
-			goto clean;
-		}
-		Log(LOG_ERROR, "image#%d: feature detect and compute OK\n", i);
-	}
-#endif
-
-#ifdef DEBUG_FUNC
-
-/*	
-	KeyPoint *ckp = NULL;
-	int j;
-
-	for (i = 0; i < inCtx->imgNum; i++)
-	{
-		printf("image#%d:+++++++++++++++++feature points cnt:%d+++++++++++++++++\n", i, inCtx->kpVecPtr[i]->size);
-		for (j = 0; j < inCtx->kpVecPtr[i]->size; j++)
-		{
-			ckp = (KeyPoint *)VECTOR_AT(inCtx->kpVecPtr[i], j);
-			printf("kp%d:[%f,%f], size=%f, angle=%f, response=%f, octave=%d, classId=%d\n",
-				   j,
-				   ckp->pt.x, ckp->pt.y,
-				   ckp->size, ckp->angle,
-				   ckp->response, ckp->octave,
-				   ckp->classId);
-		}
-	}
-
-
-	for (i = 0; i < inCtx->imgNum; i++)
-	{
-		Log(LOG_DEBUG, "image#%d: keypoints descriptor, cnt:%d, dimension:%d\n", i, inCtx->kpdesVecPtr[i]->rows, inCtx->kpdesVecPtr[i]->cols);
-		//PRINT(Mat, inCtx->kpdesVecPtr[i]);
-	}
-	*/
-#endif
-
-	ret = knnMatcher();
-	if (PANORAMA_OK != ret)
-	{
-		Log(LOG_ERROR, "feature match failed\n");
-		ret = PANORAMA_ERROR;
-		goto clean;
-	}
-
-	for (i = inCtx->imgToBeHandle; i < inCtx->imgNum; i++)
-	{
-		ret = stitch(inCtx, i);
-		if (PANORAMA_OK != ret)
-		{
-			Log(LOG_ERROR, "image#%d stitch failed\n", i);
-			ret = PANORAMA_ERROR;
-			goto clean;
-		}
-	}
-
-	/* 更新待处理图片下标 */
-	inCtx->imgToBeHandle = inCtx->imgNum;
-
-	ret = PANORAMA_PROCESS_FINISH;
-
-clean:
+	ret = percent;
+out:
 
 	return ret;
 }
@@ -347,7 +468,10 @@ int PanoramaProcessQuery (PANORAMA_CTX *ctx)
 		return PANORAMA_ERROR;
 	}
 
-	return PANORAMA_PROCESS_FINISH;
+	PANORAMA_INNER_CTX *inCtx = NULL;
+	inCtx = GET_INNER_CTX(ctx);
+
+	return inCtx->totalProcessPercent;
 }
 
 int PanoramaFetch (PANORAMA_CTX *ctx, char **ptr, int *bufsize, int *imgWidth, int *imgHeight, IMG_FORMAT *format)
@@ -360,9 +484,10 @@ int PanoramaFetch (PANORAMA_CTX *ctx, char **ptr, int *bufsize, int *imgWidth, i
 	PANORAMA_INNER_CTX *inCtx = NULL;
 	inCtx = GET_INNER_CTX(ctx);
 
-	if (INIT == inCtx->status)
+	if (STATUS_PREPARE == inCtx->status ||
+		STATUS_INIT == inCtx->status)
 	{
-		Log(LOG_ERROR, "should at least run PanoramaProcess one time\n");
+		Log(LOG_ERROR, "Panorama not available\n");
 		return PANORAMA_ERROR;
 	}
 
@@ -401,9 +526,10 @@ int PanoramaSaveToFile (PANORAMA_CTX *ctx, char *filename, int *imgWidth, int *i
 	PANORAMA_INNER_CTX *inCtx = NULL;
 	inCtx = GET_INNER_CTX(ctx);
 
-	if (INIT == inCtx->status)
+	if (STATUS_PREPARE == inCtx->status ||
+		STATUS_INIT == inCtx->status)
 	{
-		Log(LOG_ERROR, "should at least run PanoramaProcess one time\n");
+		Log(LOG_ERROR, "Panorama not available\n");
 		return PANORAMA_ERROR;
 	}
 
@@ -458,18 +584,10 @@ int PanoramaResetCtx (PANORAMA_CTX *ctx)
 
 	innerCtx->imgNum = 0;
 	innerCtx->imgToBeHandle = 0;
-	innerCtx->status = INIT;
-
-	innerCtx->cfg.yAngleOffset = 0;
-	innerCtx->cfg.viewingAngle = -1;
-	innerCtx->cfg.rotateAngle = -1;
-	innerCtx->cfg.focalLength = -1;
-	innerCtx->cfg.overlapWidth = -1;
-	innerCtx->cfg.stitchWidth = DEFAULT_STITCH_WIDTH;
-	innerCtx->cfg.imgTotalNum = -1;
-	innerCtx->cfg.outImageWidth = -1;
-	innerCtx->cfg.outImageHeight = -1;
-	innerCtx->cfg.outImageFmt = IMG_FMT_YUV420P_I420;
+	innerCtx->status = STATUS_PREPARE;
+	innerCtx->totalProcessPercent = 0;
+	
+	_PanoramaCfgInit(&innerCtx->cfg);
 
 	for (i = 0; i < MAX_IMAGE_NUM; i++)
 	{

@@ -31,14 +31,14 @@ int stitch(PANORAMA_INNER_CTX *innerCtx, int idx)
 	unsigned char *dstUStart = NULL;
 	unsigned char *dstVStart = NULL;
 
-	if (!innerCtx || idx < 0 || idx >= innerCtx->cfg.imgTotalNum)
+	if (!innerCtx || idx < 0 || idx >= innerCtx->cfg.commonImgTotalNum)
 	{
 		Log(LOG_ERROR, "arguments invalid\n");
 		return PANORAMA_ERROR;
 	}
 
-	overlap = innerCtx->cfg.overlapWidth;
-	stitchWitdh = innerCtx->cfg.stitchWidth;
+	overlap = innerCtx->cfg.stitchOverlapWidth;
+	stitchWitdh = innerCtx->cfg.stitchInterpolationWidth;
 	curImage = &innerCtx->images[idx];
 	tw = innerCtx->pano.w;
 	th = innerCtx->pano.h;

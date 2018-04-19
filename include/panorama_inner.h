@@ -14,8 +14,16 @@
 #define MAX_IMAGE_NUM 12
 
 typedef enum INNER_STATUS_E {
-	INIT = 0,
-	PROCESS,
+	STATUS_PREPARE = 0,
+	STATUS_INIT,
+	STATUS_NEW_IMAGE,
+#ifdef FEATURE_BASE
+	STATUS_FEATURE_DETECT,
+	STATUS_FEATURE_COMPUTE,
+	STATUS_FEATURE_MATCH,
+#endif
+	STATUS_STITCH,
+	STATUS_LAST
 } INNER_STATUS;
 
 typedef struct FeaturesFinder_S
@@ -36,6 +44,7 @@ typedef struct PANORAMA_INNER_CTX_S
 	int imgNum;	/* 当前已装载的图片数量 */
 	int imgToBeHandle; /* 待处理的图片编号，以0开始 */
 	INNER_STATUS status;
+	int totalProcessPercent;	/* 总的处理进度 */
 
 	PANORAMA_CFG cfg;
 	Image images[MAX_IMAGE_NUM];	/* 原始图片数据 */
@@ -50,5 +59,7 @@ typedef struct PANORAMA_INNER_CTX_S
 
 /* 获取内部contex指针 */
 #define GET_INNER_CTX(ctx) ((PANORAMA_INNER_CTX *)((ctx)->innerCtx))
+
+#define GET_SINGLE_PERCENT(status) ((int)(100 * ((status) + 1) / STATUS_LAST))
 
 #endif // __PANORAMA_PANORAMA_INNER_H__

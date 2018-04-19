@@ -5,15 +5,102 @@
 
 #define PANO_W 600
 #define PANO_H 240
-#define IMG_NUM 12
+#define IMG_NUM 6
 
 int main(int argc, char **argv)
 {
-	int i, panoBufSize, panoW, panoH, process;
+	int i, panoBufSize, panoW, panoH, curImgPercent, totalPercent;
 	int ret = PANORAMA_OK;
 	IMG_FORMAT panoFmt;
 	char *pano = NULL; 
+		
+#if 1
+#define WW 320
+#define HH 240
+#define OVERLAP 360
+#define YANGLE 0
+#define VIEWANGLE 56.7
+#define ROTATEANGLE 30
+		char *imgName[IMG_NUM] = {
+			"/home/pg/w/IPC40_srcImg_y-10_320_240/IPC_060_1_x-150y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_320_240/IPC_060_2_x-120y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_320_240/IPC_060_3_x-90y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_320_240/IPC_060_4_x-60y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_320_240/IPC_060_5_x-30y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_320_240/IPC_060_6_x0y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_320_240/IPC_060_7_x30y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_320_240/IPC_060_8_x60y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_320_240/IPC_060_9_x90y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_320_240/IPC_060_10_x120y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_320_240/IPC_060_11_x150y-10.jpg.yuv",
+		};
+#endif
+		
+#if 0
+#define WW 640
+#define HH 480
+#define OVERLAP 360
+#define YANGLE 0
+#define VIEWANGLE 56.7
+#define ROTATEANGLE 30
+		char *imgName[IMG_NUM] = {
+			"/home/pg/w/IPC40_srcImg_y-10_640_480/IPC_060_1_x-150y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_640_480/IPC_060_2_x-120y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_640_480/IPC_060_3_x-90y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_640_480/IPC_060_4_x-60y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_640_480/IPC_060_5_x-30y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_640_480/IPC_060_6_x0y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_640_480/IPC_060_7_x30y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_640_480/IPC_060_8_x60y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_640_480/IPC_060_9_x90y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_640_480/IPC_060_10_x120y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_640_480/IPC_060_11_x150y-10.jpg.yuv",
+		};
+#endif
 	
+#if 0
+#define WW 1280
+#define HH 720
+#define OVERLAP 360
+#define YANGLE 0
+#define VIEWANGLE 56.7
+#define ROTATEANGLE 30
+		char *imgName[IMG_NUM] = {
+			"/home/pg/w/IPC40_srcImg_y-10_1280_720/IPC_060_1_x-150y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_1280_720/IPC_060_2_x-120y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_1280_720/IPC_060_3_x-90y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_1280_720/IPC_060_4_x-60y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_1280_720/IPC_060_5_x-30y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_1280_720/IPC_060_6_x0y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_1280_720/IPC_060_7_x30y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_1280_720/IPC_060_8_x60y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_1280_720/IPC_060_9_x90y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_1280_720/IPC_060_10_x120y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_1280_720/IPC_060_11_x150y-10.jpg.yuv",
+		};
+#endif
+	
+#if 0
+#define WW 1280
+#define HH 720
+#define OVERLAP 360
+#define YANGLE 0
+#define VIEWANGLE 56.7
+#define ROTATEANGLE 30
+		char *imgName[IMG_NUM] = {
+			"/home/pg/w/IPC40_srcImg_ipc2_y-10_1280_720/IPC_062_1_x-150y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_ipc2_y-10_1280_720/IPC_062_2_x-120y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_ipc2_y-10_1280_720/IPC_062_3_x-90y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_ipc2_y-10_1280_720/IPC_062_4_x-60y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_ipc2_y-10_1280_720/IPC_062_5_x-30y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_ipc2_y-10_1280_720/IPC_062_6_x0y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_ipc2_y-10_1280_720/IPC_062_7_x30y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_ipc2_y-10_1280_720/IPC_062_8_x60y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_ipc2_y-10_1280_720/IPC_062_9_x90y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_ipc2_y-10_1280_720/IPC_062_10_x120y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_ipc2_y-10_1280_720/IPC_062_11_x150y-10.jpg.yuv",
+		};
+#endif
 
 #if 0
 #define WW 1280
@@ -74,7 +161,7 @@ int main(int argc, char **argv)
 		"/home/pg/w/IPC40_srcImg/IPC_060_11_x150y60.jpg.yuv",
 	};
 #endif
-#if 1
+#if 0
 #define WW 320
 #define HH 240
 #define OVERLAP 192
@@ -131,6 +218,18 @@ int main(int argc, char **argv)
 	PANORAMA_CTX *ctx = NULL;
 	PANORAMA_CFG cfg;
 
+
+	// TODO delete
+	float k;
+	//k = calcK1();
+
+	int userOverlap = -1;
+	if (argc > 1)
+	{
+		userOverlap = atoi(argv[1]);
+		printf("userOverlap=%d\n", userOverlap);
+	}
+
 	ctx = PanoramaInit();
 	if (!ctx)
 	{
@@ -146,12 +245,18 @@ int main(int argc, char **argv)
 		goto out;
 	}
 
-	cfg.imgTotalNum = IMG_NUM;
-	cfg.overlapWidth = OVERLAP;
-	cfg.stitchWidth = 50;
-	cfg.outImageFmt = IMG_FMT_YUV420P_I420;
-	cfg.outImageWidth = PANO_W;
-	cfg.outImageHeight = PANO_H;
+	cfg.commonImgTotalNum = IMG_NUM;
+	cfg.camViewingAngle = VIEWANGLE;
+	cfg.camRotateAngle = ROTATEANGLE;
+	cfg.camFocalLength = 4;
+	cfg.srcImgWidth = WW;
+	cfg.srcImgHeight = HH;
+	if (userOverlap != -1)
+		cfg.stitchOverlapWidth = userOverlap;
+	cfg.stitchInterpolationWidth = 132;
+	cfg.panoImageFmt = IMG_FMT_YUV420P_I420;
+	cfg.panoImageWidth = PANO_W;
+	cfg.panoImageHeight = PANO_H;
 
 	ret = PanoramaSetCfg(ctx, &cfg);
 	if (ret != PANORAMA_OK)
@@ -169,24 +274,28 @@ int main(int argc, char **argv)
 			goto out;
 		}
 
+		printf("image#%d\n", i);
+
 		// 处理图片
 		while (1)
 		{
-			process = PanoramaProcess(ctx);
-			if (PANORAMA_PROCESS_ERROR == process)
+			curImgPercent = PanoramaProcess(ctx);
+			if (PANORAMA_PROCESS_ERROR == curImgPercent)
 			{
 				goto out;
 			}
 
-			if (PANORAMA_PROCESS_FINISH == process)
+			// 更新当前原始图处理进度
+			printf("current image process percent: %d/100\n", curImgPercent);
+
+			// 获取总的时间进度
+			totalPercent = PanoramaProcessQuery(ctx);
+			printf("total process percent: %d/100\n", totalPercent);
+
+			if (PANORAMA_PROCESS_FINISH == curImgPercent)
 			{
 				// 完成
 				break;
-			}
-			else
-			{
-				// 更新进度
-				printf("process %d/100\n", process);
 			}
 		}
 
@@ -198,23 +307,13 @@ int main(int argc, char **argv)
 			goto out;
 		}
 
-		printf("pano.width(%d), .height(%d), panoBufSize=%d, pano=%p\n", panoW, panoH, panoBufSize, pano);
-
-		sprintf(fn, "/home/pg/w/pano-result/fetchCombine%d.yuv", i);
+		sprintf(fn, "/home/pg/w/pano-result/fetchCombine%d_totalw%d_overW%d_interW%d_%d_%d.yuv", i, panoW, cfg.stitchOverlapWidth,cfg.stitchInterpolationWidth, WW, HH);
 		fp = fopen(fn, "w+");
 		if (fp)
 		{
 			fwrite(pano, panoBufSize, 1, fp);
 			fclose(fp);
 			fp = NULL;
-		}
-
-		sprintf(fn, "/home/pg/w/pano-result/writeCombine%d.yuv", i);
-		ret = PanoramaSaveToFile(ctx, fn, &panoW, &panoH, panoFmt);
-		if (ret != PANORAMA_OK)
-		{
-			printf("PanoramaSaveToFile failed\n");
-			goto out;
 		}
 	}
 

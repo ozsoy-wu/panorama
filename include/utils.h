@@ -28,11 +28,7 @@
 	if (p) { free(p); (p) = NULL; } \
 } while (0)
 
-#ifdef DEBUG_FUNC
-#define PRINT(type, pEntity) ((type *)(pEntity))->print(pEntity)
-#else
-#define PRINT(type, pEntity)
-#endif
+#define FLOAT_EQUAL(a, b) (fabs((a) - (b)) <= 1e-5)
 
 int cvRound( double value );
 

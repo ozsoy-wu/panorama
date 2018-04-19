@@ -481,8 +481,8 @@ int fastAtan(float *x, float *y, float *angle, int n, int angleInDegrees)
 int surfFeatureDetect(SURF_CFG *cfg, Image *img, Vector *kp)
 {
 	int ret = PANORAMA_OK;
-	Mat srcImg;
-	Mat sumImg;
+	Mat *srcImg = NULL;
+	Mat *sumImg = NULL;
 
 	if (!cfg || !img)
 	{
@@ -510,8 +510,8 @@ int surfFeatureDetect(SURF_CFG *cfg, Image *img, Vector *kp)
 		goto out;
 	}
 
-	integral (&srcImg, &sumImg);
-	fastHessianDetector(&sumImg, &sumImg, kp, cfg->nOctaves, cfg->nOctaveLayers, (float)cfg->hessianThreshold);
+	integral (srcImg, sumImg);
+	fastHessianDetector(sumImg, sumImg, kp, cfg->nOctaves, cfg->nOctaveLayers, (float)cfg->hessianThreshold);
 
 out:
 	destructMat(&srcImg);

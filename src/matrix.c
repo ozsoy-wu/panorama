@@ -3,31 +3,6 @@
 #include "utils.h"
 #include "matrix.h"
 
-#ifdef DEBUG_FUNC
-void printMatrix(void *entity)
-{
-	int *p;
-	Mat *mat = (Mat *)entity;
-	printf("Mat cols=%d, rows=%d, ", mat->cols, mat->rows);
-	printf("channel=%d, elemSize1=%d, elemSize=%d, step=%d, totalSize=%d\n",
-		mat->channel, mat->elemSize1, mat->elemSize, mat->step, mat->totalSize);
-
-	int i, j;
-	for (i = 0; i < mat->rows; i++)
-	{
-		for (j = 0; j < mat->cols; j++)
-		{
-			p = (int *)MAT_AT_COOR(mat, i, j);
-
-			printf("%d, ", *p);
-			//printf("%f, ", (char)mat->data +mat->step * i + mat->elemSize * j);
-		}
-
-		printf("\n");
-	}
-}
-#endif
-
 int constructImage(Image **imgPtr, char **buf, int *bufSize, int bufCnt,
 	int imgWidth, int imgHeight, IMG_FORMAT format, int bufType)
 {
@@ -213,10 +188,6 @@ int constructMat(Mat **matPtr, int cols, int rows, int channel, int elemSize1, u
 	(*matPtr)->elemSize = elemSize1 * channel;
 	(*matPtr)->step = elemSize1 * channel * cols;
 	(*matPtr)->totalSize = (*matPtr)->step * rows;
-
-#ifdef DEBUG_FUNC
-	(*matPtr)->print = printMatrix;
-#endif
 
 	if (!dataPtr)
 	{

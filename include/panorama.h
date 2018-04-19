@@ -25,17 +25,20 @@ typedef struct PANORAMA_CTX_S
 
 typedef struct PANORAMA_CFG_S
 {
-	float yAngleOffset;	/* 镜头y轴偏移水平线角度，向上偏移取正值，向下偏移取负值 */
-	float viewingAngle;	/* 镜头视场角 */
-	float rotateAngle;	/* 相邻两张图片之间的转动角度 */
-	float focalLength;	/* 镜头焦距 */
-	int overlapWidth;	/* 镜头y轴偏移为0的情况下，相邻两张图片的重合宽度，像素单位 */
-	int stitchWidth;	/* 缝合处线性插值的宽度，像素单位 */
-	int imgTotalNum;	/* 原始图片总数量 */
-	int outImageWidth;			/* 输出全景图分辨率宽度 */
-	int outImageHeight;		/* 输出全景图分辨率高度 */
-	IMG_FORMAT outImageFmt;	/* 输出全景图图片格式 */
-	int logMask;	/* log掩码，从最低位开始，每一位代表LOG_DEBUG、LOG_INFO、LOG_WARN、LOG_ERROR、LOG_FATAL */
+	int commonImgTotalNum;	/* 原始图片总数量 */
+	int commonLogMask;		/* log掩码，从最低位开始，每一位代表LOG_DEBUG、LOG_INFO、LOG_WARN、LOG_ERROR、LOG_FATAL */
+	float camViewingAngle;			/* 镜头参数，视场角 */
+	float camYOffset;				/* 镜头参数，镜头偏移水平线角度 */
+	float camRotateAngle;			/* 镜头参数，每次转动角度 */
+	float camFocalLength;			/* 镜头参数，焦距 */
+	int stitchOverlapWidth;			/* 线性插值算法参数，相邻两张图片的重合宽度，像素单位 */
+	int stitchInterpolationWidth;	/* 线性插值算法参数，缝合处线性插值的宽度，像素单位 */
+	int srcImgWidth;				/* 原始图属性，宽度 */
+	int srcImgHeight;				/* 原始图属性，高度 */
+	IMG_FORMAT srcImageFmt;			/* 原始图属性，格式 */
+	int panoImageWidth;				/* 全景图属性，宽度 */
+	int panoImageHeight;			/* 全景图属性，高度 */
+	IMG_FORMAT panoImageFmt;		/* 全景图属性，格式 */
 } PANORAMA_CFG;
 
 PANORAMA_CTX *PanoramaInit();
@@ -50,7 +53,6 @@ int PanoramaProcessQuery (PANORAMA_CTX *ctx);
 int PanoramaFetch (PANORAMA_CTX *ctx, char **ptr, int *bufsize,	int *imgWidth, int *imgHeight, IMG_FORMAT *format);
 int PanoramaResetCtx (PANORAMA_CTX *ctx);
 int PanoramaSaveToFile (PANORAMA_CTX *ctx, char *filename,	int *imgWidth, int *imgHeight, IMG_FORMAT format);
-
 
 #define PMD(fmt...) printf("%s, %d\n", __func__, __LINE__); 
 
