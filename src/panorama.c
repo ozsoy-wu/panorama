@@ -26,6 +26,8 @@ static int _PanoramaCfgInit(PANORAMA_CFG *cfg)
 	cfg->camViewingAngle = 0;
 	cfg->camRotateAngle = 0;
 	cfg->camFocalLength = 0;
+	cfg->camDistortionK1 = 0;
+	cfg->camDistortionK2 = 0;
 	cfg->stitchOverlapWidth = -1;
 	cfg->stitchInterpolationWidth = DEFAULT_STITCH_WIDTH;
 	cfg->srcImgWidth = -1;
@@ -199,6 +201,7 @@ int PanoramaLoadSrcImgFile (PANORAMA_CTX *ctx, char *filename, int imgWidth, int
 	unsigned char *imgBuf = NULL;
 	FILE *fp;
 	Image *curImage = NULL;
+	Image *srcImage = NULL;
 	PANORAMA_INNER_CTX *inCtx = NULL;
 
 	if (!ctx || !filename)
@@ -234,12 +237,29 @@ int PanoramaLoadSrcImgFile (PANORAMA_CTX *ctx, char *filename, int imgWidth, int
 			goto error;
 		}
 
-		ret = constructImage(&curImage, (unsigned char *)&imgBuf, &imgTotalSize, 1, imgWidth,
+		/* 原始图数据 */
+		ret = constructImage(&srcImage, (unsigned char *)&imgBuf, &imgTotalSize, 1, imgWidth,
 			imgHeight, format, BUF_TYPE_NOCOPY_DELETE);
 		if (PANORAMA_OK != ret)
 		{
 			goto error;
 		}
+
+		/* 校正 */
+		undistort(inCtx->cfg.camDistortionK1, inCtx->cfg.camDistortionK2, srcImage, &curImage);
+
+		// TODO delete
+		FILE *rfp = NULL;
+		int i;
+		char fnn[50]={0};
+		sprintf(fnn, "%s_ad.yuv", filename);
+		rfp = fopen(fnn, "w+");
+		for (i = 0; i < curImage->dataBlocks; i++)
+		{
+			fwrite(curImage->data[i],curImage->dataSize[i], 1, rfp);
+		}
+		fclose(rfp);
+		
 
 		inCtx->imgNum++;
 	}
@@ -254,6 +274,8 @@ error:
 	{
 		FREE(imgBuf);
 	}
+
+	destructImage(&srcImage);
 
 	return ret;
 }
@@ -340,6 +362,9 @@ int PanoramaProcess (PANORAMA_CTX *ctx)
 			inCtx->status = STATUS_INIT;
 			break;
 		case STATUS_INIT:
+			// TODO delete
+			//inCtx->cfg.stitchOverlapWidth = inCtx->images[0].w * ((inCtx->cfg.camViewingAngle - inCtx->cfg.camRotateAngle) / inCtx->cfg.camViewingAngle);
+			
 			panoW = inCtx->images[0].w * inCtx->cfg.commonImgTotalNum;
 			panoW -= inCtx->cfg.stitchOverlapWidth * (inCtx->cfg.commonImgTotalNum - 1);
 			panoH = inCtx->images[0].h;

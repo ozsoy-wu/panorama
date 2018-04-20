@@ -53,7 +53,7 @@ typedef struct Matrix_S
 int integral(Mat *src, Mat *sum);
 
 int constructImage(Image **imgPtr, char **buf, int *bufSize, int bufCnt,
-	int imgWidth, int imgHeight, IMG_FORMAT format, int copy);
+	int imgWidth, int imgHeight, IMG_FORMAT format, int bufType);
 int destructImage(Image **imgPtr);
 
 int constructMat(Mat **matPtr, int cols, int rows, int channel, int elemSize1, unsigned char *dataPtr);

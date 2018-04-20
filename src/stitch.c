@@ -44,6 +44,9 @@ int stitch(PANORAMA_INNER_CTX *innerCtx, int idx)
 	th = innerCtx->pano.h;
 	curImageStart = idx * (curImage->w - overlap);
 
+	Dbg("va=%f, ra=%f, w=%d\n", innerCtx->cfg.camViewingAngle, innerCtx->cfg.camRotateAngle, curImage->w);
+	Dbg("overlap=%f\n", overlap);
+
 	ySize = tw * th;
 	uSize = vSize = ySize / 4;
 

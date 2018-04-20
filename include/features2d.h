@@ -52,13 +52,18 @@ typedef Mat KeyPointDescriptor;
 	kp->octave = (octave);\
 	kp->classId = (classId);\
 } while(0)
+
+#define CORRECT_COOR(v, k1, r2, k2, r4) ((v)*(1+(k1)*(r2)+(k2)*(r4)))
+
+
 float pointOverlap(KeyPoint *kp1, KeyPoint *kp2 );
 int keypointAssignment(KeyPoint *kp, float x, float y, float size,
 		float angle, float response, int octave, int classId);
 int keypointVectorPush(Vector *vPtr, float x, float y, float size,
 		float angle, float response, int octave, int classId);
 
-float calcK1();
-int undistort(float k, float k2, Image *src, Image *dst);
+int calcK1(double *k1);
+int undistort(double k, double k2, Image *src, Image **dst);
+float pointDisPower2(Point *p1, Point *p2 );
 
 #endif // __PANORAMA_FEATURES2D_H__

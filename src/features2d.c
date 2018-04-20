@@ -3,121 +3,367 @@
 #include "panorama.h"
 #include "features2d.h"
 #include "utils.h"
+#include "log.h"
 
-#if 0
-float calcK1()
+int calcK1(double *k1)
 {
+	int j;
+	int imgW = 1280;
+	int imgH = 720;
+	double halfImgW = imgW / 2;
+	double halfImgH = imgH / 2;
+
 	// 原点
 	Point p0;
-	p0.x = 640;
-	p0.y = 360;
+	p0.x = 0;
+	p0.y = 0;
 
+	/*
 	int hpcnt = 13;
-	float hpx[100] = {
+	double hpx[100] = {
 		43, 65, 87, 113, 145, 177, 205, 270, 319, 361, 404, 462, 499};
-	float hpy[100] = {
+	double hpy[100] = {
 		10, 11, 12, 13, 15, 17, 20, 26, 30, 34, 38, 44, 48};
 
-	int vpcnt = 11;
-	float vpx[100] = {
-		41, 38, 35, 28, 26, 25, 22, 17, 14, 13, 12};
-	float vpy[100] = {
-		13, 34, 36, 115, 144, 155, 187, 259, 297, 322, 359};
+	*/
 
-	Point[100] hp;
-	Point[100] vp;
+	int vpcnt = 11;
+	double vpx[100] = {41, 38, 35, 28, 26, 25, 22, 17, 14, 13, 12};
+	double vpy[100] = {13, 34, 36, 115, 144, 155, 187, 259, 297, 322, 359};
+
+	int hpcnt = 15;
+	double hpx[100] = {
+		30, 27, 25, 23, 20, 17, 17, 16, 16, 16, 17, 18, 22, 25, 30};
+	double hpy[100] = {
+		34, 70, 105, 142, 179, 216, 254, 292, 329, 367, 406, 444, 518, 592, 663};
+
+	Point hp[100];
+	Point vp[100];
 
 	// 赋值
 	int i;
 	for (i = 0; i < hpcnt; i++)
 	{
-		hp.x = hpx[i];
-		hp.y = hpy[i];
+		hp[i].x = hpx[i] - halfImgW;
+		hp[i].y = hpy[i] - halfImgH;
 	}
 	for (i = 0; i < vpcnt; i++)
 	{
-		vp.x = vpx[i];
-		vp.y = vpy[i];
+		vp[i].x = vpx[i] - halfImgW;
+		vp[i].y = vpy[i] - halfImgH;
 	}
 
-	float vk1, vk2;
+	int calcCnt = 0;
+	double vk1, vk2;
+	double finalhk1, finalvk1, finalk1;
+	double vk1Left, vk1Right;
+
+	Point endp1, endp2;
+	double p1R2, p2R2;
+	double p1R4, p2R4;
+	double lineDisNumerator;
+	double lineDisDenominator;
+	double xb, yb, xe, ye;
+	double totalD, curD;
+	double lastDis = -1;
+	double thresh;
+
+	// 端点赋值
+	endp1.x = hp[0].x;
+	endp1.y = hp[0].y;
+	endp2.x = hp[hpcnt-1].x;
+	endp2.y = hp[hpcnt-1].y;
+
+
+	// 计算距离原点距离平方
+	p1R2 = pointDisPower2(&p0, &endp1);
+	p2R2 = pointDisPower2(&p0, &endp2);
+	p1R4 = p1R2 * p1R2;
+	p2R4 = p2R2 * p2R2;
+
+	calcCnt = 0;
+	thresh = 10;
+	vk1Left = 0;
+	vk1Right = 10;
+	while (vk1Left < vk1Right)
+	{
+		calcCnt++;
+		totalD = 0.;
+
+		vk1 = (vk1Left + vk1Right) / 2;
+
+		// 校正后直线端点
+		xb = endp1.x * (1 + vk1 * p1R2);
+		yb = endp1.y * (1 + vk1 * p1R2);
+		xe = endp2.x * (1 + vk1 * p2R2);
+		ye = endp2.y * (1 + vk1 * p2R2);
+
+		// 计算直线距离的分母
+		lineDisDenominator = sqrt((ye - yb) * (ye - yb) + (xe - xb) * (xe - xb));
+		for (i = 1; i < hpcnt - 1; i++)
+		{
+			lineDisNumerator = ((ye - yb) * hp[i].x -
+				(xe - xb) * hp[i].y +
+				((xe - xb) * yb - (ye - yb) * xb));
+			curD = lineDisNumerator / lineDisDenominator;
+			totalD += curD;
+
+			//Dbg("point#%d, distance=%f\n", i, curD);
+		}
+		//printf("interator%d, totalD=%10.15f, vk1=%10.20f\n", calcCnt, totalD, vk1);
 	
+		finalhk1 = vk1;
+		if (fabs(totalD) <= 1e-10)
+		{
+			break;
+		}
+		else if (totalD > 0)
+		{
+			vk1Right = vk1;
+		}
+		else if (totalD < 0)
+		{
+			vk1Left = vk1;
+		}
+
+		if (calcCnt >= 5000)
+		{
+			break;
+		}
+	}
+
+
+#if 0
+	// ================== 计算第二组坐标 =========================
+	// 端点赋值
+	endp1.x = vp[0].x;
+	endp1.y = vp[0].y;
+	endp2.x = vp[vpcnt-1].x;
+	endp2.y = vp[vpcnt-1].y;
+
+
+	// 计算距离原点距离平方
+	p1R2 = pointDisPower2(&p0, &endp1);
+	p2R2 = pointDisPower2(&p0, &endp2);
+	p1R4 = p1R2 * p1R2;
+	p2R4 = p2R2 * p2R2;
+
+	calcCnt = 0;
+	thresh = 10;
+	vk1Left = 0;
+	vk1Right = 10;
+	while (vk1Left < vk1Right)
+	{
+		calcCnt++;
+		totalD = 0.;
+
+		vk1 = (vk1Left + vk1Right) / 2;
+
+		// 校正后直线端点
+		xb = endp1.x * (1 + vk1 * p1R2);
+		yb = endp1.y * (1 + vk1 * p1R2);
+		xe = endp2.x * (1 + vk1 * p2R2);
+		ye = endp2.y * (1 + vk1 * p2R2);
+
+		// 计算直线距离的分母
+		lineDisDenominator = sqrt((ye - yb) * (ye - yb) + (xe - xb) * (xe - xb));
+		for (i = 1; i < vpcnt - 1; i++)
+		{
+			lineDisNumerator = ((ye - yb) * vp[i].x -
+				(xe - xb) * vp[i].y +
+				((xe - xb) * yb - (ye - yb) * xb));
+			curD = lineDisNumerator / lineDisDenominator;
+			totalD += curD;
+		}
+		printf("interator%d, totalD=%10.15f, vk1=%10.20f\n", calcCnt, totalD, vk1);
+	
+		finalvk1 = vk1;
+		if (fabs(totalD) <= 1e-10)
+		{
+			break;
+		}
+		else if (totalD > 0)
+		{
+			vk1Right = vk1;
+		}
+		else if (totalD < 0)
+		{
+			vk1Left = vk1;
+		}
+
+		if (calcCnt >= 5000)
+		{
+			break;
+		}
+	}
+
+	finalk1 = (finalhk1 + finalvk1 ) / 2;
+#endif
+
+	printf("final H k1 = %10.20f\n", finalhk1);
+	printf("final V k1 = %10.20f\n", finalvk1);
+	printf("final  k1 = %10.20f\n", finalk1);
+
+	*k1 = finalhk1;
+
+	return PANORAMA_OK;
 }
 
-
-int undistort(float k, float k2, Image *src, Image *dst)
+/* 矫正 */
+int undistort(double k, double k2, Image *src, Image **dstImg)
 {
-	int i, j;
+	int ret;
+	int i, j, subi, subj;
 	int scol, srow;
+	double halfW, halfH;
 	int upx, upy, downx, downy;
-	int dstMaxX, dstMaxY;
-	float dx, dy;
-	float rbx, rby;
-	float dispower2;
+	int dstW, dstH;
+	int dstHalfW, dstHalfH;
+	double dx, dy;
+	double rbx, rby;
+	double dispower2, dispower4;
+	double projectionX, projectionY; // 以中心为原点之后的原始图像素坐标
 	Point p0, tmp, lastPoint;
 	unsigned char *srcHeadPtr;
 	unsigned char *srcPtr;
-
-	scol = src->w;
-	srow = src->h;
-	p0.x = src->w / 2;
-	p0.y = src->h / 2;
-
-	// right bottom
-	tmp.x = src->w;
-	tmp.y = src->h;
-	dispower2 = pointDisPower2(&p0, &tmp);
-	rbx = tmp.x + k * dispower2;
-	rby = tmp.y + k * dispower2;
-
-	dstMaxX = ceil(rbx);
-	dstMaxY = ceil(rby);
-
 	unsigned char *ptr0;
 	unsigned char *ptr1;
 	unsigned char *ptr2;
 	unsigned char *ptr3;
-	Mat *dst = NULL;
-	constructMat(&dst, dstMaxX, dstMaxY, 1, sizeof(unsigned char), NULL);
+	Mat *yDst = NULL;
+	Mat *uDst = NULL;
+	Mat *vDst = NULL;
+
+	scol = src->w;
+	srow = src->h;
+	halfW = src->w / 2;
+	halfH = src->h / 2;
+	p0.x = 0;
+	p0.y = 0;
+	
+	printf("k1=%10.20f, k2=%10.20f\n", k, k2);
+
+	// right bottom
+	tmp.x = halfW;
+	tmp.y = halfH;
+	dispower2 = pointDisPower2(&p0, &tmp);
+	dispower4 = dispower2 * dispower2;
+	rbx = CORRECT_COOR(tmp.x, k, dispower2, k2, dispower4);
+	rby = CORRECT_COOR(tmp.y, k, dispower2, k2, dispower4);
+
+	dstW = 2 * ceil(rbx);
+	dstH = 2 * ceil(rby);
+	dstHalfW = dstW / 2;
+	dstHalfH = dstH / 2;
+
+	/* 后续步骤需要用到该数据，由deinit释放 */
+	ret = constructImage(dstImg, NULL, NULL, 0, dstW, dstH, src->imgFmt, BUF_TYPE_NOBUF);
+	if (PANORAMA_OK != ret)
+	{
+		ret = PANORAMA_ERROR;
+		goto clean;
+	}
+
+	Dbg("[%d, %d] -> [%d, %d]\n", scol, srow, dstW, dstH);
+
+	ret = constructMat(&yDst, dstW, dstH, 1, sizeof(unsigned char), (*dstImg)->data[0]);
+	if (PANORAMA_OK != ret)
+	{
+		ret = PANORAMA_ERROR;
+		goto clean;
+	}
+
+	ret = constructMat(&uDst, dstHalfW, dstHalfH, 1, sizeof(unsigned char),
+		(*dstImg)->data[0] + dstW * dstH);
+	if (PANORAMA_OK != ret)
+	{
+		ret = PANORAMA_ERROR;
+		goto clean;
+	}
+
+	ret = constructMat(&vDst, dstHalfW, dstHalfH, 1, sizeof(unsigned char),
+		(*dstImg)->data[0] + dstW * dstH + dstHalfW * dstHalfH);
+	if (PANORAMA_OK != ret)
+	{
+		ret = PANORAMA_ERROR;
+		goto clean;
+	}
 
 	srcHeadPtr = src->data[0];
-
-	lastPoint.x = p0.x;
-	lastPoint.y = p0.y;
-	for (j = p0.y; j >= 0; j--)
+	printf("srcHeadPtr=%p\n", srcHeadPtr);
+	for (j = 0; j < src->h; j++)
 	{
-		for (i = p0.x; i <= scol; i++)
+		for (i = 0; i < src->w; i++)
 		{
 			srcPtr = srcHeadPtr + src->w * j + i;
-		
-			tmp.x = i;
-			tmp.y = j;
+
+			projectionX = i - halfW;
+			projectionY = j - halfH;
+			tmp.x = projectionX;
+			tmp.y = projectionY;
 			dispower2 = pointDisPower2(&p0, &tmp);
-			dx = i + k * dispower2;
-			dy = j + k * dispower2;
+			dx = CORRECT_COOR(projectionX, k, dispower2, k2, 0);
+			dy = CORRECT_COOR(projectionY, k, dispower2, k2, 0);
 
-			upx = ceil(dx);
-			upy = ceil(dy);
-			downx = floor(dx);
-			downy = floor(dy);
+			if (dx < 0)
+			{
+				upx = floor(dx);
+				downx = ceil(dx);
+			}
+			else
+			{
+				upx = ceil(dx);
+				downx = floor(dx);
+			}
+			if (dy < 0)
+			{
+				upy = floor(dy);
+				downy = ceil(dy);
+			}
+			else
+			{
+				upy = ceil(dy);
+				downy = floor(dy);
+			}
+				upx = ceil(dx);
+				downx = floor(dx);
+				upy = ceil(dy);
+				downy = floor(dy);
 
-			ptr0 = (unsigned char *)MAT_AT_COOR(dst, downx, downy);
-			ptr1 = (unsigned char *)MAT_AT_COOR(dst, upx, downy);
-			ptr2 = (unsigned char *)MAT_AT_COOR(dst, downx, upy);
-			ptr3 = (unsigned char *)MAT_AT_COOR(dst, upx, upy);
+			upx += dstHalfW;
+			upy += dstHalfH;
+			downx += dstHalfW;
+			downy += dstHalfH;
 
-			*ptr0 += (((float)upx - dx) * (*srcPtr));
-			*ptr1 += ((dx - (float)downx) * (*srcPtr));
-			*ptr2 += (((float)upx - dx) * (*srcPtr));
-			*ptr3 += (((float)upx - dx) * (*srcPtr));
-			
+			for (subi = downy; subi <= upy; subi++)
+			{
+				for (subj = downx; subj <= upx; subj++)
+				{
+					ptr0 = (unsigned char *)MAT_AT_COOR(yDst, subi, subj);
+					*ptr0 = *srcPtr;
 
-			lastPoint.x = dx;
-			lastPoint.y = dy;
+					/*
+					ptr1 = (unsigned char *)MAT_AT_COOR(yDst, upx, downy);
+					ptr2 = (unsigned char *)MAT_AT_COOR(yDst, downx, upy);
+					ptr3 = (unsigned char *)MAT_AT_COOR(yDst, upx, upy);
+
+					*ptr0 += (((float)upx - dx) * (*srcPtr));
+					*ptr1 += ((dx - (float)downx) * (*srcPtr));
+					*ptr2 += (((float)upx - dx) * (*srcPtr));
+					*ptr3 += (((float)upx - dx) * (*srcPtr));
+					*/
+				}
+			}
 		}
 	}
+
+clean:
+	destructMat(&vDst);
+	destructMat(&uDst);
+	destructMat(&yDst);
+
+	return ret;
 }
-#endif
 
 float pointDisPower2(Point *p1, Point *p2 )
 {

@@ -5,7 +5,7 @@
 
 #define PANO_W 600
 #define PANO_H 240
-#define IMG_NUM 6
+#define IMG_NUM 8
 
 int main(int argc, char **argv)
 {
@@ -13,8 +13,48 @@ int main(int argc, char **argv)
 	int ret = PANORAMA_OK;
 	IMG_FORMAT panoFmt;
 	char *pano = NULL; 
-		
-#if 1
+
+#if 0
+#define WW 1280
+#define HH 720
+#define OVERLAP 360
+#define YANGLE 0
+#define VIEWANGLE 56.7
+#define ROTATEANGLE 30
+		char *imgName[IMG_NUM] = {
+			"/home/pg/w/IPC40_srcImg_y-10_1280_720/IPC_060_1_x-150y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_1280_720/IPC_060_2_x-120y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_1280_720/IPC_060_3_x-90y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_1280_720/IPC_060_4_x-60y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_1280_720/IPC_060_5_x-30y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_1280_720/IPC_060_6_x0y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_1280_720/IPC_060_7_x30y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_1280_720/IPC_060_8_x60y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_1280_720/IPC_060_9_x90y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_1280_720/IPC_060_10_x120y-10.jpg.yuv",
+			"/home/pg/w/IPC40_srcImg_y-10_1280_720/IPC_060_11_x150y-10.jpg.yuv",
+		};
+#endif
+#if 0
+#define WW 1280
+#define HH 720
+#define OVERLAP 360
+#define YANGLE 0
+#define VIEWANGLE 56.7
+#define ROTATEANGLE 30
+	char *imgName[IMG_NUM] = {
+		"/home/pg/w/IPC40-tc#1/1.jpg.yuv",
+		"/home/pg/w/IPC40-tc#1/2.jpg.yuv",
+		"/home/pg/w/IPC40-tc#1/3.jpg.yuv",
+		"/home/pg/w/IPC40-tc#1/4.jpg.yuv",
+		"/home/pg/w/IPC40-tc#1/5.jpg.yuv",
+		"/home/pg/w/IPC40-tc#1/6.jpg.yuv",
+		"/home/pg/w/IPC40-tc#1/7.jpg.yuv",
+		"/home/pg/w/IPC40-tc#1/8.jpg.yuv",
+	};
+#endif
+
+#if 0
 #define WW 320
 #define HH 240
 #define OVERLAP 360
@@ -57,8 +97,8 @@ int main(int argc, char **argv)
 			"/home/pg/w/IPC40_srcImg_y-10_640_480/IPC_060_11_x150y-10.jpg.yuv",
 		};
 #endif
-	
-#if 0
+
+#if 1
 #define WW 1280
 #define HH 720
 #define OVERLAP 360
@@ -66,17 +106,11 @@ int main(int argc, char **argv)
 #define VIEWANGLE 56.7
 #define ROTATEANGLE 30
 		char *imgName[IMG_NUM] = {
-			"/home/pg/w/IPC40_srcImg_y-10_1280_720/IPC_060_1_x-150y-10.jpg.yuv",
-			"/home/pg/w/IPC40_srcImg_y-10_1280_720/IPC_060_2_x-120y-10.jpg.yuv",
-			"/home/pg/w/IPC40_srcImg_y-10_1280_720/IPC_060_3_x-90y-10.jpg.yuv",
-			"/home/pg/w/IPC40_srcImg_y-10_1280_720/IPC_060_4_x-60y-10.jpg.yuv",
-			"/home/pg/w/IPC40_srcImg_y-10_1280_720/IPC_060_5_x-30y-10.jpg.yuv",
-			"/home/pg/w/IPC40_srcImg_y-10_1280_720/IPC_060_6_x0y-10.jpg.yuv",
-			"/home/pg/w/IPC40_srcImg_y-10_1280_720/IPC_060_7_x30y-10.jpg.yuv",
-			"/home/pg/w/IPC40_srcImg_y-10_1280_720/IPC_060_8_x60y-10.jpg.yuv",
-			"/home/pg/w/IPC40_srcImg_y-10_1280_720/IPC_060_9_x90y-10.jpg.yuv",
-			"/home/pg/w/IPC40_srcImg_y-10_1280_720/IPC_060_10_x120y-10.jpg.yuv",
-			"/home/pg/w/IPC40_srcImg_y-10_1280_720/IPC_060_11_x150y-10.jpg.yuv",
+			"/home/pg/w/IPC40A_adjust_src/1_26.2cm.jpg.yuv",
+			"/home/pg/w/IPC40A_adjust_src/2_26.5cm.jpg.yuv",
+			"/home/pg/w/IPC40A_adjust_src/3_26.2cm.jpg.yuv",
+			"/home/pg/w/IPC40A_adjust_src/6_26.0cm.jpg.yuv",
+			"/home/pg/w/IPC40A_adjust_src/6_29.5cm.jpg.yuv",
 		};
 #endif
 	
@@ -220,8 +254,10 @@ int main(int argc, char **argv)
 
 
 	// TODO delete
-	float k;
-	//k = calcK1();
+	double k1;
+	calcK1(&k1);
+
+	printf("k1=%10.20f\n", k1);
 
 	int userOverlap = -1;
 	if (argc > 1)
@@ -237,7 +273,6 @@ int main(int argc, char **argv)
 		goto out;
 	}
 
-
 	ret = PanoramaGetCfg(ctx, &cfg);
 	if (ret != PANORAMA_OK)
 	{
@@ -249,11 +284,14 @@ int main(int argc, char **argv)
 	cfg.camViewingAngle = VIEWANGLE;
 	cfg.camRotateAngle = ROTATEANGLE;
 	cfg.camFocalLength = 4;
+	cfg.camDistortionK1 = k1 * 6;
+	printf("cfg.camDistortionK1=%10.10f\n", cfg.camDistortionK1);
+	cfg.camDistortionK2 = 0;
 	cfg.srcImgWidth = WW;
 	cfg.srcImgHeight = HH;
 	if (userOverlap != -1)
 		cfg.stitchOverlapWidth = userOverlap;
-	cfg.stitchInterpolationWidth = 132;
+	cfg.stitchInterpolationWidth = 100;
 	cfg.panoImageFmt = IMG_FMT_YUV420P_I420;
 	cfg.panoImageWidth = PANO_W;
 	cfg.panoImageHeight = PANO_H;
@@ -286,7 +324,7 @@ int main(int argc, char **argv)
 			}
 
 			// 更新当前原始图处理进度
-			printf("current image process percent: %d/100\n", curImgPercent);
+			// printf("current image process percent: %d/100\n", curImgPercent);
 
 			// 获取总的时间进度
 			totalPercent = PanoramaProcessQuery(ctx);
@@ -306,6 +344,8 @@ int main(int argc, char **argv)
 			printf("PanoramaFetch failed\n");
 			goto out;
 		}
+		
+		ret = PanoramaGetCfg(ctx, &cfg);
 
 		sprintf(fn, "/home/pg/w/pano-result/fetchCombine%d_totalw%d_overW%d_interW%d_%d_%d.yuv", i, panoW, cfg.stitchOverlapWidth,cfg.stitchInterpolationWidth, WW, HH);
 		fp = fopen(fn, "w+");

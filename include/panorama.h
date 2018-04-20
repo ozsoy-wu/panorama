@@ -31,6 +31,8 @@ typedef struct PANORAMA_CFG_S
 	float camYOffset;				/* 镜头参数，镜头偏移水平线角度 */
 	float camRotateAngle;			/* 镜头参数，每次转动角度 */
 	float camFocalLength;			/* 镜头参数，焦距 */
+	double camDistortionK1;			/* 镜头参数，畸变系数k1 */
+	double camDistortionK2;			/* 镜头参数，畸变系数k2 */
 	int stitchOverlapWidth;			/* 线性插值算法参数，相邻两张图片的重合宽度，像素单位 */
 	int stitchInterpolationWidth;	/* 线性插值算法参数，缝合处线性插值的宽度，像素单位 */
 	int srcImgWidth;				/* 原始图属性，宽度 */
@@ -53,7 +55,5 @@ int PanoramaProcessQuery (PANORAMA_CTX *ctx);
 int PanoramaFetch (PANORAMA_CTX *ctx, char **ptr, int *bufsize,	int *imgWidth, int *imgHeight, IMG_FORMAT *format);
 int PanoramaResetCtx (PANORAMA_CTX *ctx);
 int PanoramaSaveToFile (PANORAMA_CTX *ctx, char *filename,	int *imgWidth, int *imgHeight, IMG_FORMAT format);
-
-#define PMD(fmt...) printf("%s, %d\n", __func__, __LINE__); 
 
 #endif // __PANORAMA_PANORAMA_H__
