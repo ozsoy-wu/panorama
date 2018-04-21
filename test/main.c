@@ -255,7 +255,7 @@ int main(int argc, char **argv)
 
 	// TODO delete
 	double k1;
-	calcK1(&k1);
+	//calcK1(&k1);
 
 	printf("k1=%10.20f\n", k1);
 
