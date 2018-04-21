@@ -228,6 +228,7 @@ int PanoramaLoadSrcImgFile (PANORAMA_CTX *ctx, char *filename, int imgWidth, int
 		fp = fopen(filename, "r");
 		if (!fp)
 		{
+			Log(LOG_ERROR, "open file %s failed\n", filename);
 			goto error;
 		}
 

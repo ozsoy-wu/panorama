@@ -257,8 +257,6 @@ int main(int argc, char **argv)
 	double k1;
 	//calcK1(&k1);
 
-	printf("k1=%10.20f\n", k1);
-
 	int userOverlap = -1;
 	if (argc > 1)
 	{

@@ -224,12 +224,17 @@ int undistort(double k, double k2, Image *src, Image **dstImg)
 	double dispower2, dispower4;
 	double projectionX, projectionY; // 以中心为原点之后的原始图像素坐标
 	Point p0, tmp, lastPoint;
+	int srcySize, srcuSize, srcvSize;
 	unsigned char *srcHeadPtr;
 	unsigned char *srcPtr;
+	unsigned char *srcuPtr;
+	unsigned char *srcvPtr;
 	unsigned char *ptr0;
-	unsigned char *ptr1;
-	unsigned char *ptr2;
-	unsigned char *ptr3;
+	unsigned char *uptr;
+	unsigned char *vptr;
+	Mat *ySrc = NULL;
+	Mat *uSrc = NULL;
+	Mat *vSrc = NULL;
 	Mat *yDst = NULL;
 	Mat *uDst = NULL;
 	Mat *vDst = NULL;
@@ -238,6 +243,8 @@ int undistort(double k, double k2, Image *src, Image **dstImg)
 	srow = src->h;
 	halfW = src->w / 2;
 	halfH = src->h / 2;
+	srcySize = scol * srow;
+	srcuSize = srcvSize = (scol / 2) * (srow / 2);
 	p0.x = 0;
 	p0.y = 0;
 	
@@ -266,23 +273,43 @@ int undistort(double k, double k2, Image *src, Image **dstImg)
 
 	Dbg("[%d, %d] -> [%d, %d]\n", scol, srow, dstW, dstH);
 
-	ret = constructMat(&yDst, dstW, dstH, 1, sizeof(unsigned char), (*dstImg)->data[0]);
+	
+	ret = constructMat(&ySrc, scol, srow, 1, sizeof(unsigned char), IMAGE_Y_PTR(src));
 	if (PANORAMA_OK != ret)
 	{
 		ret = PANORAMA_ERROR;
 		goto clean;
 	}
 
-	ret = constructMat(&uDst, dstHalfW, dstHalfH, 1, sizeof(unsigned char),
-		(*dstImg)->data[0] + dstW * dstH);
+	ret = constructMat(&uSrc, halfW, halfH, 1, sizeof(unsigned char), IMAGE_U_PTR(src));
 	if (PANORAMA_OK != ret)
 	{
 		ret = PANORAMA_ERROR;
 		goto clean;
 	}
 
-	ret = constructMat(&vDst, dstHalfW, dstHalfH, 1, sizeof(unsigned char),
-		(*dstImg)->data[0] + dstW * dstH + dstHalfW * dstHalfH);
+	ret = constructMat(&vSrc, halfW, halfH, 1, sizeof(unsigned char), IMAGE_V_PTR(src));
+	if (PANORAMA_OK != ret)
+	{
+		ret = PANORAMA_ERROR;
+		goto clean;
+	}
+
+	ret = constructMat(&yDst, dstW, dstH, 1, sizeof(unsigned char), IMAGE_Y_PTR(*dstImg));
+	if (PANORAMA_OK != ret)
+	{
+		ret = PANORAMA_ERROR;
+		goto clean;
+	}
+
+	ret = constructMat(&uDst, dstHalfW, dstHalfH, 1, sizeof(unsigned char), IMAGE_U_PTR(*dstImg));
+	if (PANORAMA_OK != ret)
+	{
+		ret = PANORAMA_ERROR;
+		goto clean;
+	}
+
+	ret = constructMat(&vDst, dstHalfW, dstHalfH, 1, sizeof(unsigned char), IMAGE_V_PTR(*dstImg));
 	if (PANORAMA_OK != ret)
 	{
 		ret = PANORAMA_ERROR;
@@ -295,7 +322,9 @@ int undistort(double k, double k2, Image *src, Image **dstImg)
 	{
 		for (i = 0; i < src->w; i++)
 		{
-			srcPtr = srcHeadPtr + src->w * j + i;
+			srcPtr = (unsigned char *)MAT_AT_COOR(ySrc, j, i);
+			srcuPtr = (unsigned char *)MAT_AT_COOR(uSrc, j/2, i/2);
+			srcvPtr = (unsigned char *)MAT_AT_COOR(vSrc, j/2, i/2);
 
 			projectionX = i - halfW;
 			projectionY = j - halfH;
@@ -305,30 +334,10 @@ int undistort(double k, double k2, Image *src, Image **dstImg)
 			dx = CORRECT_COOR(projectionX, k, dispower2, k2, 0);
 			dy = CORRECT_COOR(projectionY, k, dispower2, k2, 0);
 
-			if (dx < 0)
-			{
-				upx = floor(dx);
-				downx = ceil(dx);
-			}
-			else
-			{
-				upx = ceil(dx);
-				downx = floor(dx);
-			}
-			if (dy < 0)
-			{
-				upy = floor(dy);
-				downy = ceil(dy);
-			}
-			else
-			{
-				upy = ceil(dy);
-				downy = floor(dy);
-			}
-				upx = ceil(dx);
-				downx = floor(dx);
-				upy = ceil(dy);
-				downy = floor(dy);
+			upx = ceil(dx);
+			downx = floor(dx);
+			upy = ceil(dy);
+			downy = floor(dy);
 
 			upx += dstHalfW;
 			upy += dstHalfH;
@@ -339,19 +348,17 @@ int undistort(double k, double k2, Image *src, Image **dstImg)
 			{
 				for (subj = downx; subj <= upx; subj++)
 				{
+					// Y
 					ptr0 = (unsigned char *)MAT_AT_COOR(yDst, subi, subj);
 					*ptr0 = *srcPtr;
 
-					/*
-					ptr1 = (unsigned char *)MAT_AT_COOR(yDst, upx, downy);
-					ptr2 = (unsigned char *)MAT_AT_COOR(yDst, downx, upy);
-					ptr3 = (unsigned char *)MAT_AT_COOR(yDst, upx, upy);
+					// U
+					uptr = (unsigned char *)MAT_AT_COOR(uDst, subi/2, subj/2);
+					*uptr = *srcuPtr;
 
-					*ptr0 += (((float)upx - dx) * (*srcPtr));
-					*ptr1 += ((dx - (float)downx) * (*srcPtr));
-					*ptr2 += (((float)upx - dx) * (*srcPtr));
-					*ptr3 += (((float)upx - dx) * (*srcPtr));
-					*/
+					// V
+					vptr = (unsigned char *)MAT_AT_COOR(vDst, subi/2, subj/2);
+					*vptr = *srcvPtr;
 				}
 			}
 		}
@@ -361,6 +368,9 @@ clean:
 	destructMat(&vDst);
 	destructMat(&uDst);
 	destructMat(&yDst);
+	destructMat(&vSrc);
+	destructMat(&uSrc);
+	destructMat(&ySrc);
 
 	return ret;
 }

@@ -47,6 +47,32 @@ typedef struct Matrix_S
 	unsigned char *data; // TODO ͼƬ
 } Mat;
 
+#define IMAGE_Y_PTR(iPtr) ((unsigned char *)(iPtr)->data[0])
+#define IMAGE_U_PTR(iPtr) ({\
+	int ysize = (iPtr)->w* (iPtr)->h; \
+	unsigned char *res; \
+	if ((iPtr)->dataBlocks == 1) { \
+		res = (unsigned char *)(iPtr)->data[0] + ysize; \
+	} else if ((iPtr)->dataBlocks >= 2) { \
+		res= (unsigned char *)(iPtr)->data[1]; \
+	} \
+	res; \
+})
+#define IMAGE_V_PTR(iPtr) ({\
+	int ysize = (iPtr)->w * (iPtr)->h; \
+	int usize = ((iPtr)->w / 2) * ((iPtr)->h / 2); \
+	unsigned char *res; \
+	if ((iPtr)->dataBlocks == 1) { \
+		res = (unsigned char *)(iPtr)->data[0] + ysize + usize; \
+	} else if ((iPtr)->dataBlocks == 2) { \
+		res= (unsigned char *)(iPtr)->data[1] + usize; \
+	} \
+	else if ((iPtr)->dataBlocks == 3) { \
+		res= (unsigned char *)(iPtr)->data[3]; \
+	} \
+	res; \
+})
+
 #define MAT_ROW_PTR(matPtr, row) ((unsigned char *)((matPtr)->data) + ((row) * (matPtr)->step))
 #define MAT_AT_COOR(matPtr, row, col) ((unsigned char *)((matPtr)->data) + ((row) * (matPtr)->step) + (col) * (matPtr)->elemSize * (matPtr)->channel)
 
