@@ -1,0 +1,11 @@
+#self
+#.gitignore
+
+#CLion files
+
+# build
+obj/
+lib/
+*.so
+*.o
+pn

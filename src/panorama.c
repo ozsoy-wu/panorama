@@ -172,6 +172,9 @@ int PanoramaGetCfg (PANORAMA_CTX *ctx, PANORAMA_CFG *cfg)
 
 int PanoramaSetCfg (PANORAMA_CTX *ctx, PANORAMA_CFG *cfg)
 {
+	int ret;
+	double k1;
+
 	if (!ctx || !cfg)
 	{
 		return PANORAMA_ERROR;
@@ -184,6 +187,18 @@ int PanoramaSetCfg (PANORAMA_CTX *ctx, PANORAMA_CFG *cfg)
 	{
 		Log(LOG_ERROR, "Cfg check failed\n");
 		return PANORAMA_ERROR;
+	}
+
+	if (FLOAT_EQUAL(cfg->camDistortionK1, -1))
+	{
+		ret = calcK1(&k1);
+		if (PANORAMA_OK != ret)
+		{
+			Log(LOG_ERROR, "calcK1 failed\n");
+			return PANORAMA_ERROR;
+		}
+
+		cfg->camDistortionK1 = k1;
 	}
 
 	memcpy(&inCtx->cfg, cfg, sizeof(PANORAMA_CFG));
@@ -253,7 +268,7 @@ int PanoramaLoadSrcImgFile (PANORAMA_CTX *ctx, char *filename, int imgWidth, int
 		FILE *rfp = NULL;
 		int i;
 		char fnn[50]={0};
-		sprintf(fnn, "%s_ad.yuv", filename);
+		sprintf(fnn, "%s_ad_%d-%d.yuv", filename, curImage->w, curImage->h);
 		rfp = fopen(fnn, "w+");
 		for (i = 0; i < curImage->dataBlocks; i++)
 		{
