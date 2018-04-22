@@ -139,7 +139,7 @@ int main(int argc, char **argv)
 	IMG_FORMAT panoFmt;
 	char *pano = NULL; 
 
-    int retval = parseCmdArgs(argc, argv);
+	int retval = parseCmdArgs(argc, argv);
 	if (retval != 0)
 	{
 		return retval;
@@ -196,10 +196,9 @@ int main(int argc, char **argv)
 		if (PANORAMA_OK != PanoramaLoadSrcImgFile(ctx,
 					fns[i], gSrcW, gSrcH, IMG_FMT_YUV420P_I420))
 		{
+			printf("PanoramaLoadSrcImgFile failed\n");
 			goto out;
 		}
-
-		printf("image#%d\n", i);
 
 		// 处理图片
 		while (1)
@@ -207,6 +206,7 @@ int main(int argc, char **argv)
 			curImgPercent = PanoramaProcess(ctx);
 			if (PANORAMA_PROCESS_ERROR == curImgPercent)
 			{
+				printf("PanoramaProcess failed\n");
 				goto out;
 			}
 
@@ -215,7 +215,7 @@ int main(int argc, char **argv)
 
 			// 获取总的时间进度
 			totalPercent = PanoramaProcessQuery(ctx);
-			printf("total process percent: %d/100\n", totalPercent);
+			//printf("total process percent: %d/100\n", totalPercent);
 
 			if (PANORAMA_PROCESS_FINISH == curImgPercent)
 			{
@@ -243,6 +243,8 @@ int main(int argc, char **argv)
 			fp = NULL;
 		}
 	}
+
+	printf("finish\n");
 
 out:
 

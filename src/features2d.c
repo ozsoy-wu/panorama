@@ -22,8 +22,9 @@ int distortCalcK1K2(double distortLevel, int W, int H, double *k1, double *k2)
 	double vk1Left, vk1Right;
 
 	Point endp1, endp2, midp;
-	double p1R2, p2R2;
-	double p1R4, p2R4;
+	double p1R2, p1R4;
+	double p2R2, p2R4;
+	double mpR2, mpR4;
 	double lineDisNumerator, p0DisNumerator;
 	double lineDisDenominator;
 	double xb, yb, xe, ye, xm, ym;
@@ -41,6 +42,11 @@ int distortCalcK1K2(double distortLevel, int W, int H, double *k1, double *k2)
 	p2R2 = pointDisPower2(&p0, &endp2);
 	p1R4 = p1R2 * p1R2;
 	p2R4 = p2R2 * p2R2;
+	mpR2 = pointDisPower2(&p0, &midp);
+	mpR4 = mpR2 * mpR2;
+
+	Dbg("endp1=[%10.20f, %10.20f], endp2=[%10.20f, %10.20f], midp=[%10.20f, %10.20f]\n",
+			endp1.x, endp1.y, endp2.x, endp2.y, midp.x, midp.y);
 
 	calcCnt = 0;
 	vk1Left = 0;
@@ -56,8 +62,8 @@ int distortCalcK1K2(double distortLevel, int W, int H, double *k1, double *k2)
 		yb = CORRECT_COOR(endp1.y, vk1, p1R2, vk2, p1R4);
 		xe = CORRECT_COOR(endp2.x, vk1, p2R2, vk2, p2R4);
 		ye = CORRECT_COOR(endp2.y, vk1, p2R2, vk2, p2R4);
-		xm = CORRECT_COOR(midp.x, vk1, p2R2, vk2, p2R4);
-		ym = CORRECT_COOR(midp.y, vk1, p2R2, vk2, p2R4);
+		xm = CORRECT_COOR(midp.x, vk1, mpR2, vk2, mpR4);
+		ym = CORRECT_COOR(midp.y, vk1, mpR2, vk2, mpR4);
 
 		// 计算原点与直线的关系
 		p0DisNumerator = ((ye - yb) * p0.x -
@@ -69,15 +75,19 @@ int distortCalcK1K2(double distortLevel, int W, int H, double *k1, double *k2)
 		lineDisNumerator = ((ye - yb) * xm -
 				(xe - xb) * ym +
 				((xe - xb) * yb - (ye - yb) * xb));
+
+//		Dbg("numerator=%10.20f, de=%10.20f\n", lineDisNumerator, lineDisDenominator);
 		curD = lineDisNumerator / lineDisDenominator;
 
 		if (fabs(curD) <= 1e-15)
 		{
+			Dbg("curD = %10.20f\n", curD);
 			break;
 		}
 
 		if (calcCnt >= 5000)
 		{
+			Dbg("reach max count %d\n", calcCnt);
 			break;
 		}
 
@@ -86,11 +96,11 @@ int distortCalcK1K2(double distortLevel, int W, int H, double *k1, double *k2)
 		{
 			if (SAME_SIDE_WITH_P0(p0DisNumerator, lineDisNumerator))
 			{
-				vk1Left = vk1;
+				vk1Right = vk1;
 			}
 			else
 			{
-				vk1Right = vk1;
+				vk1Left = vk1;
 			}
 		}
 		// 枕形畸变
@@ -98,11 +108,11 @@ int distortCalcK1K2(double distortLevel, int W, int H, double *k1, double *k2)
 		{
 			if (SAME_SIDE_WITH_P0(p0DisNumerator, lineDisNumerator))
 			{
-				vk1Right = vk1;
+				vk1Left = vk1;
 			}
 			else
 			{
-				vk1Left = vk1;
+				vk1Right = vk1;
 			}
 		}
 	}
@@ -158,8 +168,9 @@ int calcK1(double *k1)
 	double vk1Left, vk1Right;
 
 	Point endp1, endp2;
-	double p1R2, p2R2;
-	double p1R4, p2R4;
+	double p1R2, p1R4;
+	double p2R2, p2R4;
+	double mpR2, mpR4;
 	double lineDisNumerator, p0DisNumerator;
 	double lineDisDenominator;
 	double xb, yb, xe, ye, xm, ym;
@@ -184,7 +195,7 @@ int calcK1(double *k1)
 	thresh = 10;
 	vk1Left = 0;
 	vk1Right = 10;
-	vk2 = 0; // 暂不计算k2
+	vk2 = 0; // 不计算k2
 	while (vk1Left < vk1Right)
 	{
 		calcCnt++;
@@ -207,13 +218,20 @@ int calcK1(double *k1)
 		lineDisDenominator = sqrt((ye - yb) * (ye - yb) + (xe - xb) * (xe - xb));
 		for (i = 1; i < hpcnt - 1; i++)
 		{
-			//xm = CORRECT_COOR(hp[i].x, vk1, p2R2, vk2, p2R4);
-			//ym = CORRECT_COOR(hp[i].y, vk1, p2R2, vk2, p2R4);
-			xm = hp[i].x;
-			ym = hp[i].y;
+
+			mpR2 = pointDisPower2(&p0, &hp[i]);
+			mpR4 = mpR2 * mpR2;
+			xm = CORRECT_COOR(hp[i].x, vk1, mpR2, vk2, mpR4);
+			ym = CORRECT_COOR(hp[i].y, vk1, mpR2, vk2, mpR4);
+			//xm = hp[i].x;
+			//ym = hp[i].y;
 			lineDisNumerator = ((ye - yb) * xm -
 				(xe - xb) * ym +
 				((xe - xb) * yb - (ye - yb) * xb));
+			/*
+			curD = (lineDisNumerator) / lineDisDenominator;
+			totalD += curD;
+			*/
 			curD = fabs(lineDisNumerator) / lineDisDenominator;
 
 			if (SAME_SIDE_WITH_P0(p0DisNumerator, lineDisNumerator))
@@ -227,13 +245,15 @@ int calcK1(double *k1)
 		}
 	
 		finalhk1 = vk1;
-		if (fabs(totalD) <= 1e-10)
+		if (fabs(totalD) <= 1e-20)
 		{
+			Dbg("totalD = %10.20f\n", totalD);
 			break;
 		}
 
 		if (calcCnt >= 5000)
 		{
+			Dbg("cnt reach max(%d)\n", calcCnt);
 			break;
 		}
 
@@ -363,7 +383,7 @@ int undistort(double k, double k2, Image *src, Image **dstImg)
 	p0.x = 0;
 	p0.y = 0;
 	
-	printf("k1=%10.20f, k2=%10.20f\n", k, k2);
+	Dbg("k1=%10.20f, k2=%10.20f\n", k, k2);
 
 	// right bottom
 	tmp.x = halfW;
@@ -432,7 +452,6 @@ int undistort(double k, double k2, Image *src, Image **dstImg)
 	}
 
 	srcHeadPtr = src->data[0];
-	printf("srcHeadPtr=%p\n", srcHeadPtr);
 	for (j = 0; j < src->h; j++)
 	{
 		for (i = 0; i < src->w; i++)

@@ -173,7 +173,7 @@ int PanoramaGetCfg (PANORAMA_CTX *ctx, PANORAMA_CFG *cfg)
 int PanoramaSetCfg (PANORAMA_CTX *ctx, PANORAMA_CFG *cfg)
 {
 	int ret;
-	double k1;
+	double k1, k1FromLevel, k2FromLevel;
 
 	if (!ctx || !cfg)
 	{
@@ -191,6 +191,8 @@ int PanoramaSetCfg (PANORAMA_CTX *ctx, PANORAMA_CFG *cfg)
 
 	if (FLOAT_EQUAL(cfg->camDistortionK1, -1))
 	{
+		distortCalcK1K2(-0.00857, cfg->srcImgWidth,
+			cfg->srcImgHeight, &k1FromLevel, &k2FromLevel);
 		ret = calcK1(&k1);
 		if (PANORAMA_OK != ret)
 		{
@@ -198,7 +200,11 @@ int PanoramaSetCfg (PANORAMA_CTX *ctx, PANORAMA_CFG *cfg)
 			return PANORAMA_ERROR;
 		}
 
+		// TODO select one k1
 		cfg->camDistortionK1 = k1;
+		cfg->camDistortionK1 = k1FromLevel;
+
+		Log(LOG_DEBUG, "k1 from coor = %10.20f, k1from level = %10.20f\n", k1, k1FromLevel);
 	}
 
 	memcpy(&inCtx->cfg, cfg, sizeof(PANORAMA_CFG));
@@ -237,20 +243,22 @@ int PanoramaLoadSrcImgFile (PANORAMA_CTX *ctx, char *filename, int imgWidth, int
 		imgBuf = lMalloc(unsigned char, sizeof(unsigned char) * imgTotalSize);
 		if (!imgBuf)
 		{
-			goto error;
+			Log(LOG_ERROR, "malloc image buf failed\n");
+			goto clean;
 		}
 
 		fp = fopen(filename, "r");
 		if (!fp)
 		{
 			Log(LOG_ERROR, "open file %s failed\n", filename);
-			goto error;
+			goto clean;
 		}
 
 		nread = fread(imgBuf, 1, imgTotalSize, fp);
 		if (nread < imgTotalSize)
 		{
-			goto error;
+			Log(LOG_ERROR, "read %d bytes while %d bytes expected\n");
+			goto clean;
 		}
 
 		/* 原始图数据 */
@@ -258,7 +266,7 @@ int PanoramaLoadSrcImgFile (PANORAMA_CTX *ctx, char *filename, int imgWidth, int
 			imgHeight, format, BUF_TYPE_NOCOPY_DELETE);
 		if (PANORAMA_OK != ret)
 		{
-			goto error;
+			goto clean;
 		}
 
 		/* 校正 */
@@ -276,7 +284,6 @@ int PanoramaLoadSrcImgFile (PANORAMA_CTX *ctx, char *filename, int imgWidth, int
 		}
 		fclose(rfp);
 		
-
 		inCtx->imgNum++;
 	}
 	else
@@ -285,7 +292,7 @@ int PanoramaLoadSrcImgFile (PANORAMA_CTX *ctx, char *filename, int imgWidth, int
 	}
 
 	return PANORAMA_OK;
-error:
+clean:
 	if (imgBuf)
 	{
 		FREE(imgBuf);
@@ -307,6 +314,7 @@ int PanoramaLoadSrcImgBuffer (PANORAMA_CTX *ctx, char **buf,
 	int ret;
 	int idx;
 	Image *curImage = NULL;
+	Image *srcImage = NULL;
 	PANORAMA_INNER_CTX *inCtx = NULL;
 
 	inCtx = GET_INNER_CTX(ctx);
@@ -316,22 +324,32 @@ int PanoramaLoadSrcImgBuffer (PANORAMA_CTX *ctx, char **buf,
 
 	if (copy)
 	{
-		ret = constructImage(&curImage, buf, bufSize, bufCnt, imgWidth,
+		ret = constructImage(&srcImage, buf, bufSize, bufCnt, imgWidth,
 			imgHeight, format, BUF_TYPE_COPY_NODELETE);
 	}
 	else
 	{
-		ret = constructImage(&curImage, buf, bufSize, bufCnt, imgWidth,
+		ret = constructImage(&srcImage, buf, bufSize, bufCnt, imgWidth,
 			imgHeight, format, BUF_TYPE_NOCOPY_NODELETE);
 	}
 
 	if (PANORAMA_OK != ret)
 	{
-		return PANORAMA_ERROR;
+		ret = PANORAMA_ERROR;
+		goto clean;
 	}
 
+	/* 校正 */
+	undistort(inCtx->cfg.camDistortionK1, inCtx->cfg.camDistortionK2, srcImage, &curImage);
+
 	inCtx->imgNum++;
-	return PANORAMA_OK;
+	ret = PANORAMA_OK;
+
+clean:
+	destructImage(&srcImage);
+
+	return ret;
+
 }
 
 int PanoramaProcess (PANORAMA_CTX *ctx)
@@ -379,14 +397,9 @@ int PanoramaProcess (PANORAMA_CTX *ctx)
 			inCtx->status = STATUS_INIT;
 			break;
 		case STATUS_INIT:
-			distortCalcK1K2(-0.00857, inCtx->cfg.srcImgWidth,
-				inCtx->cfg.srcImgHeight, &k1FromLevel, &k2FromLevel);
-			calcK1(&k1FromPoint);
-
-			Dbg("\nk1 from level = %10.20f\nk1 from coor = %10.20f\n",
-				k1FromLevel, k1FromPoint);
-
-			inCtx->cfg.camDistortionK1 = k1FromPoint;
+//			distortCalcK1K2(-0.00857, inCtx->cfg.srcImgWidth,
+//				inCtx->cfg.srcImgHeight, &k1FromLevel, &k2FromLevel);
+//			calcK1(&k1FromPoint);
 
 			panoW = inCtx->images[0].w * inCtx->cfg.commonImgTotalNum;
 			panoW -= inCtx->cfg.stitchOverlapWidth * (inCtx->cfg.commonImgTotalNum - 1);
@@ -420,6 +433,12 @@ int PanoramaProcess (PANORAMA_CTX *ctx)
 				ret = PANORAMA_PROCESS_FINISH;
 				goto out;
 			}
+
+			inCtx->status = STATUS_UNDISTORT_IMAGE;
+			break;
+		case STATUS_UNDISTORT_IMAGE:
+			/* 校正 */
+			//undistort(inCtx->cfg.camDistortionK1, inCtx->cfg.camDistortionK2, srcImage, &curImage);
 #ifdef FEATURE_BASE
 			inCtx->status = STATUS_FEATURE_DETECT;
 			break;
