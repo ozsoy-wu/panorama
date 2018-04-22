@@ -341,6 +341,7 @@ int PanoramaProcess (PANORAMA_CTX *ctx)
 	int percent;
 	int currentStep = 0;
 	int totalStep = 0;
+	double k1FromLevel, k2FromLevel, k1FromPoint;
 	Image *img = NULL;
 	INNER_STATUS status;
 
@@ -378,13 +379,21 @@ int PanoramaProcess (PANORAMA_CTX *ctx)
 			inCtx->status = STATUS_INIT;
 			break;
 		case STATUS_INIT:
-			// TODO delete
-			//inCtx->cfg.stitchOverlapWidth = inCtx->images[0].w * ((inCtx->cfg.camViewingAngle - inCtx->cfg.camRotateAngle) / inCtx->cfg.camViewingAngle);
-			
+			distortCalcK1K2(-0.00857, inCtx->cfg.srcImgWidth,
+				inCtx->cfg.srcImgHeight, &k1FromLevel, &k2FromLevel);
+			calcK1(&k1FromPoint);
+
+			Dbg("\nk1 from level = %10.20f\nk1 from coor = %10.20f\n",
+				k1FromLevel, k1FromPoint);
+
+			inCtx->cfg.camDistortionK1 = k1FromPoint;
+
 			panoW = inCtx->images[0].w * inCtx->cfg.commonImgTotalNum;
 			panoW -= inCtx->cfg.stitchOverlapWidth * (inCtx->cfg.commonImgTotalNum - 1);
 			panoH = inCtx->images[0].h;
 			img = &inCtx->pano;
+
+			Dbg("stitchOverlapWidth=%d, panoW=%d, panoH=%d, size=%d\n", inCtx->cfg.stitchOverlapWidth, panoW, panoH, panoH * panoW);
 			ret = constructImage(&img, NULL, NULL, 0, panoW,
 				panoH, inCtx->images[0].imgFmt, BUF_TYPE_NOBUF);
 			if (PANORAMA_OK != ret)
