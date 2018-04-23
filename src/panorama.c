@@ -29,7 +29,7 @@ static int _PanoramaCfgInit(PANORAMA_CFG *cfg)
 	cfg->camDistortionK1 = 0;
 	cfg->camDistortionK2 = 0;
 	cfg->stitchOverlapWidth = -1;
-	cfg->stitchInterpolationWidth = DEFAULT_STITCH_WIDTH;
+	cfg->stitchInterpolationPercent = DEFAULT_STITCH_WIDTH_PERCENT;
 	cfg->srcImgWidth = -1;
 	cfg->srcImgHeight = -1;
 	cfg->srcImageFmt = IMG_FMT_YUV420P_I420;
@@ -58,34 +58,28 @@ static int _PanoramaCfgCheck(PANORAMA_CFG *cfg)
 		return PANORAMA_ERROR;
 	}
 
-	/* 如果cfg里提供的重合区域宽度参数非法，那么将从镜头参数及原始图宽度计算重合区域宽度 */
-	if (cfg->stitchOverlapWidth < 0)
+	if (FLOAT_EQUAL(cfg->camViewingAngle, 0) || cfg->camViewingAngle < 0)
 	{
-		if (FLOAT_EQUAL(cfg->camViewingAngle, 0) ||
-			FLOAT_EQUAL(cfg->camRotateAngle, 0) ||
-			cfg->srcImgWidth <= 0)
-		{
-			Log(LOG_ERROR, "Invalid camera arguments\n");
-			return PANORAMA_ERROR;
-		}
-
-		overlap = (cfg->srcImgWidth * (cfg->camViewingAngle - cfg->camRotateAngle)) / cfg->camViewingAngle;
-		cfg->stitchOverlapWidth = (int)overlap;
-
-		Dbg("va(%f), ra(%f), w(%d), overlap(%f)\n",
-			cfg->camViewingAngle,
-			cfg->camRotateAngle,
-			cfg->srcImgWidth,
-			overlap);
-
-		Log(LOG_DEBUG, "Calculate overlap width = %d\n", cfg->stitchOverlapWidth);
+		Log(LOG_ERROR, "Invalid camViewingAngle %10.10f\n", cfg->camViewingAngle);
+		return PANORAMA_ERROR;
 	}
 
-	/* 线性插值区域宽度须小于重合区域宽度 */
-	if (cfg->stitchInterpolationWidth > cfg->stitchOverlapWidth)
+	if (FLOAT_EQUAL(cfg->camRotateAngle, 0) || cfg->camRotateAngle < 0)
 	{
-		Log(LOG_ERROR, "Interpolation width(%d) too large, should smaller than overlap width(%d)\n",
-			cfg->stitchInterpolationWidth, cfg->stitchOverlapWidth);
+		Log(LOG_ERROR, "Invalid camViewingAngle %10.10f\n", cfg->camRotateAngle);
+		return PANORAMA_ERROR;
+	}
+
+	if (cfg->srcImgWidth <= 0 ||cfg->srcImgHeight <= 0)
+	{
+		Log(LOG_ERROR, "Invalid source image size [%d * %d]\n", cfg->srcImgWidth, cfg->srcImgHeight);
+		return PANORAMA_ERROR;
+	}
+
+	if (cfg->stitchInterpolationPercent < 0 || cfg->stitchInterpolationPercent > 100)
+	{
+		Log(LOG_ERROR, "Invalid Interpolation Percent %d, should in range [0, 100]\n",
+			cfg->stitchInterpolationPercent);
 		return PANORAMA_ERROR;
 	}
 
@@ -174,6 +168,9 @@ int PanoramaSetCfg (PANORAMA_CTX *ctx, PANORAMA_CFG *cfg)
 {
 	int ret;
 	double k1, k1FromLevel, k2FromLevel;
+	double p1R2, p1R4;
+	int midW, midH;
+	Point p0, p1;
 
 	if (!ctx || !cfg)
 	{
@@ -193,19 +190,54 @@ int PanoramaSetCfg (PANORAMA_CTX *ctx, PANORAMA_CFG *cfg)
 	{
 		distortCalcK1K2(-0.00857, cfg->srcImgWidth,
 			cfg->srcImgHeight, &k1FromLevel, &k2FromLevel);
-		ret = calcK1(&k1);
 		if (PANORAMA_OK != ret)
 		{
 			Log(LOG_ERROR, "calcK1 failed\n");
 			return PANORAMA_ERROR;
 		}
 
-		// TODO select one k1
-		cfg->camDistortionK1 = k1;
-		cfg->camDistortionK1 = k1FromLevel;
-
 		Log(LOG_DEBUG, "k1 from coor = %10.20f, k1from level = %10.20f\n", k1, k1FromLevel);
 	}
+
+	/* 计算原始图像矫正后的分辨率 */
+	p0.x = 0;
+	p0.y = 0;
+	p1.x = cfg->srcImgWidth / 2;
+	p1.y = cfg->srcImgHeight / 2;
+	p1R2 = pointDisPower2(&p0, &p1);
+	p1R4 = p1R2 * p1R2;
+
+	/* 矫正后的图像分辨率 */
+	midW = 2 * ceil(CORRECT_COOR(p1.x, cfg->camDistortionK1, p1R2, cfg->camDistortionK2, p1R4));
+	midH = 2 * ceil(CORRECT_COOR(p1.y, cfg->camDistortionK1, p1R2, cfg->camDistortionK2, p1R4));
+	inCtx->undistortImgW = midW;
+	inCtx->undistortImgH = midH;
+
+	/* 计算重合区域宽度 */
+	if (cfg->stitchOverlapWidth == -1){
+		inCtx->stitchOverlapWidth = ceil((midW * (cfg->camViewingAngle - cfg->camRotateAngle)) / cfg->camViewingAngle);
+		if (inCtx->stitchOverlapWidth & 0x1)
+		{
+			inCtx->stitchOverlapWidth--;
+		}
+	}
+	else
+	{
+		inCtx->stitchOverlapWidth = cfg->stitchOverlapWidth;
+	}
+
+	/* 计算插值宽度 */
+	inCtx->stitchInterpolationWidth = ceil(inCtx->stitchOverlapWidth * cfg->stitchInterpolationPercent / 100);
+	if (inCtx->stitchInterpolationWidth & 0x1)
+	{
+		inCtx->stitchInterpolationWidth--;
+	}
+
+	Dbg("sw%d, iw%d\n", inCtx->stitchOverlapWidth, inCtx->stitchInterpolationWidth);
+
+	/* pano */
+	inCtx->pano.w = cfg->commonImgTotalNum * midW - (cfg->commonImgTotalNum - 1) * inCtx->stitchOverlapWidth;
+	inCtx->pano.h = midH;
 
 	memcpy(&inCtx->cfg, cfg, sizeof(PANORAMA_CFG));
 	gLogMask = cfg->commonLogMask;
@@ -275,7 +307,7 @@ int PanoramaLoadSrcImgFile (PANORAMA_CTX *ctx, char *filename, int imgWidth, int
 		// TODO delete
 		FILE *rfp = NULL;
 		int i;
-		char fnn[50]={0};
+		char fnn[250]={0};
 		sprintf(fnn, "%s_ad_%d-%d.yuv", filename, curImage->w, curImage->h);
 		rfp = fopen(fnn, "w+");
 		for (i = 0; i < curImage->dataBlocks; i++)
@@ -283,7 +315,7 @@ int PanoramaLoadSrcImgFile (PANORAMA_CTX *ctx, char *filename, int imgWidth, int
 			fwrite(curImage->data[i],curImage->dataSize[i], 1, rfp);
 		}
 		fclose(rfp);
-		
+
 		inCtx->imgNum++;
 	}
 	else
@@ -397,16 +429,12 @@ int PanoramaProcess (PANORAMA_CTX *ctx)
 			inCtx->status = STATUS_INIT;
 			break;
 		case STATUS_INIT:
-//			distortCalcK1K2(-0.00857, inCtx->cfg.srcImgWidth,
-//				inCtx->cfg.srcImgHeight, &k1FromLevel, &k2FromLevel);
-//			calcK1(&k1FromPoint);
-
-			panoW = inCtx->images[0].w * inCtx->cfg.commonImgTotalNum;
-			panoW -= inCtx->cfg.stitchOverlapWidth * (inCtx->cfg.commonImgTotalNum - 1);
-			panoH = inCtx->images[0].h;
 			img = &inCtx->pano;
+			panoW = img->w;
+			panoH = img->h;
 
-			Dbg("stitchOverlapWidth=%d, panoW=%d, panoH=%d, size=%d\n", inCtx->cfg.stitchOverlapWidth, panoW, panoH, panoH * panoW);
+			Dbg("pano.wh = %d, %d\n", panoW, panoH);
+
 			ret = constructImage(&img, NULL, NULL, 0, panoW,
 				panoH, inCtx->images[0].imgFmt, BUF_TYPE_NOBUF);
 			if (PANORAMA_OK != ret)
@@ -415,7 +443,7 @@ int PanoramaProcess (PANORAMA_CTX *ctx)
 				ret = PANORAMA_PROCESS_ERROR;
 				goto out;
 			}
-			
+
 			inCtx->status = STATUS_NEW_IMAGE;
 			break;
 		case STATUS_NEW_IMAGE:

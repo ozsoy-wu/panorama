@@ -4,7 +4,7 @@
 #include "panorama.h"
 #include "panorama_inner.h"
 
-#define DEFAULT_STITCH_WIDTH 10
+#define DEFAULT_STITCH_WIDTH_PERCENT 10
 
 int stitch(PANORAMA_INNER_CTX *innerCtx, int idx);
 

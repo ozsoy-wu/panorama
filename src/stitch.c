@@ -37,15 +37,12 @@ int stitch(PANORAMA_INNER_CTX *innerCtx, int idx)
 		return PANORAMA_ERROR;
 	}
 
-	overlap = innerCtx->cfg.stitchOverlapWidth;
-	stitchWitdh = innerCtx->cfg.stitchInterpolationWidth;
+	overlap = innerCtx->stitchOverlapWidth;
+	stitchWitdh = innerCtx->stitchInterpolationWidth;
 	curImage = &innerCtx->images[idx];
 	tw = innerCtx->pano.w;
 	th = innerCtx->pano.h;
 	curImageStart = idx * (curImage->w - overlap);
-
-	Dbg("va=%f, ra=%f, w=%d\n", innerCtx->cfg.camViewingAngle, innerCtx->cfg.camRotateAngle, curImage->w);
-	Dbg("overlap=%f\n", overlap);
 
 	ySize = tw * th;
 	uSize = vSize = ySize / 4;

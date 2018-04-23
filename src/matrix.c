@@ -13,16 +13,14 @@ int constructImage(Image **imgPtr, char **buf, int *bufSize, int bufCnt,
 
 	if (!imgPtr)
 	{
-		printf("[%s, %d]\n", __func__, __LINE__);
 		return PANORAMA_ERROR;
 	}
 
 	if (!(*imgPtr))
 	{
 		*imgPtr = tMalloc(Image);
-		if (!*imgPtr)
+		if (!(*imgPtr))
 		{
-		printf("[%s, %d]\n", __func__, __LINE__);
 			return PANORAMA_ERROR;
 		}
 		memset(*imgPtr, 0, sizeof(Image));
@@ -30,9 +28,12 @@ int constructImage(Image **imgPtr, char **buf, int *bufSize, int bufCnt,
 	}
 	else
 	{
+	
 		(*imgPtr)->selfNeedFree = 0;
+		(*imgPtr)->w = imgWidth;
+		(*imgPtr)->h = imgHeight;
+		(*imgPtr)->imgFmt = format;
 	}
-
 
 	(*imgPtr)->w = imgWidth;
 	(*imgPtr)->h = imgHeight;
@@ -47,7 +48,6 @@ int constructImage(Image **imgPtr, char **buf, int *bufSize, int bufCnt,
 		{
 			if (!buf[i] || bufSize[i] <= 0)
 			{
-		printf("[%s, %d]\n", __func__, __LINE__);
 				goto err;
 			}
 
@@ -56,7 +56,6 @@ int constructImage(Image **imgPtr, char **buf, int *bufSize, int bufCnt,
 			newP = (unsigned char *)lMalloc(unsigned char, bufSize[i]);
 			if (!newP)
 			{
-		printf("[%s, %d]\n", __func__, __LINE__);
 				goto err;
 			}
 			memset(newP, 0, bufSize[i]);
@@ -106,7 +105,6 @@ int constructImage(Image **imgPtr, char **buf, int *bufSize, int bufCnt,
 		newP = (unsigned char *)lMalloc(unsigned char, imgSize);
 		if (!newP)
 		{
-		printf("[%s, %d], imgSize=%d\n", __func__, __LINE__, imgSize);
 			goto err;
 		}
 		memset(newP, 0, imgSize);

@@ -33,8 +33,8 @@ typedef struct PANORAMA_CFG_S
 	float camFocalLength;			/* 镜头参数，焦距 */
 	double camDistortionK1;			/* 镜头参数，畸变系数k1 */
 	double camDistortionK2;			/* 镜头参数，畸变系数k2 */
-	int stitchOverlapWidth;			/* 线性插值算法参数，相邻两张图片的重合宽度，像素单位 */
-	int stitchInterpolationWidth;	/* 线性插值算法参数，缝合处线性插值的宽度，像素单位 */
+	int stitchOverlapWidth;			/* 线性插值算法参数，重合区域宽度 */
+	int stitchInterpolationPercent;	/* 线性插值算法参数，对重合区域的n%进行插值，n即为本参数 */
 	int srcImgWidth;				/* 原始图属性，宽度 */
 	int srcImgHeight;				/* 原始图属性，高度 */
 	IMG_FORMAT srcImageFmt;			/* 原始图属性，格式 */

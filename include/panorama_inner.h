@@ -47,6 +47,12 @@ typedef struct PANORAMA_INNER_CTX_S
 	INNER_STATUS status;
 	int totalProcessPercent;	/* 总的处理进度 */
 
+	/* 以下参数由cfg的配置计算得到 */
+	int undistortImgW;				/* 矫正图中心水平线宽度 */
+	int undistortImgH;				/* 矫正图中心竖直线宽度 */
+	int stitchOverlapWidth;			/* 线性插值算法参数，相邻两张图片的重合宽度，像素单位 */
+	int stitchInterpolationWidth;	/* 线性插值算法参数，对重合区域的n%进行插值，n即为本参数 */
+
 	PANORAMA_CFG cfg;
 	Image images[MAX_IMAGE_NUM];	/* 原始图片数据 */
 	Image pano;	/* 全景图 */

@@ -59,7 +59,7 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.c
 test: preBuild panorama pn
 
 pn: $(TEST_OBJS)
-	$(CC) -o $(TESTNAME) $(TEST_OBJS) -L$(LIBDIR) -l$(LIBNAMEFORSHORT)
+	$(CC) -o $(TESTNAME) $(TEST_OBJS) -L$(LIBDIR) -l$(LIBNAMEFORSHORT) $(LIB_FLAGS)
 
 #$(OBJDIR)/$.o: $(TESTDIR)/$.c
 $(OBJDIR)/main.o: $(TESTDIR)/main.c
