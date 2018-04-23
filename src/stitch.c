@@ -8,6 +8,8 @@ int stitch(PANORAMA_INNER_CTX *innerCtx, int idx)
 	int tw = 0;
 	int th = 0;
 	int overlap = 0;
+	int interpolateCnt = 0;
+	double interpolateWidth = 0.;
 	int stitchWitdh = 0;
 	int stitchBegin = 0;
 	int stitchEnd = 0;
@@ -56,6 +58,7 @@ int stitch(PANORAMA_INNER_CTX *innerCtx, int idx)
 
 	stitchBegin = (overlap - stitchWitdh)>>1;
 	stitchEnd = (overlap + stitchWitdh)>>1;
+	interpolateWidth = (double)((double)stitchEnd - (double)stitchBegin);
 
 	// Y
 	for (j = 0; j < curImage->h; j++)
@@ -72,15 +75,18 @@ int stitch(PANORAMA_INNER_CTX *innerCtx, int idx)
 		}
 		else
 		{
+			interpolateCnt = 0;
 			for (k = 0; k < curImage->w; k++)
 			{
-				if (k < stitchBegin)
+				if (k <= stitchBegin)
 				{
 					//dyp[k] = dyp[k];
 				}
 				else if (k < stitchEnd)
 				{
-					dyp[k] = syp[k] * k/overlap + dyp[k] * (overlap - k) / overlap;
+					dyp[k] = syp[k] * (double)interpolateCnt/interpolateWidth +
+						dyp[k] * (double)(interpolateWidth - interpolateCnt) / interpolateWidth;
+					interpolateCnt++;
 				}
 				else
 				{
@@ -91,6 +97,7 @@ int stitch(PANORAMA_INNER_CTX *innerCtx, int idx)
 	}
 
 	// UV
+	interpolateCnt = 0;
 	if (IMG_FMT_YUV420P_I420 == curImage->imgFmt)
 	{
 		if (1 == curImage->dataBlocks)
@@ -140,6 +147,7 @@ int stitch(PANORAMA_INNER_CTX *innerCtx, int idx)
 			}
 			else
 			{
+				interpolateCnt = 0;
 				for (k = 0; k < curImage->w; k++)
 				{
 					if (k%2 == 1)
@@ -149,14 +157,17 @@ int stitch(PANORAMA_INNER_CTX *innerCtx, int idx)
 
 					uvidx = k/2;
 
-					if (k < stitchBegin)
+					if (k <= stitchBegin)
 					{
 						// do nothing
 					}
 					else if (k < stitchEnd)
 					{
-						dup[uvidx] = sup[uvidx] * k/overlap +dup[uvidx] *(overlap - k) / overlap;
-						dvp[uvidx] = svp[uvidx] * k/overlap +dvp[uvidx] *(overlap - k) / overlap;
+						dup[uvidx] = sup[uvidx] * interpolateCnt/interpolateWidth +
+							dup[uvidx] *(interpolateWidth - interpolateCnt) / interpolateWidth;
+						dvp[uvidx] = svp[uvidx] * interpolateCnt/interpolateWidth +
+							dvp[uvidx] *(interpolateWidth - interpolateCnt) / interpolateWidth;
+						interpolateCnt++;
 					}
 					else
 					{

@@ -123,6 +123,155 @@ int distortCalcK1K2(double distortLevel, int W, int H, double *k1, double *k2)
 	return PANORAMA_OK;
 }
 
+int calcK1(double *k1)
+{
+	int j;
+	int imgW = 1280;
+	int imgH = 720;
+	double halfImgW = imgW / 2;
+	double halfImgH = imgH / 2;
+
+	// 原点
+	Point p0;
+	p0.x = 0;
+	p0.y = 0;
+
+	int vpcnt = 11;
+	double vpx[100] = {41, 38, 35, 28, 26, 25, 22, 17, 14, 13, 12};
+	double vpy[100] = {13, 34, 36, 115, 144, 155, 187, 259, 297, 322, 359};
+
+	int hpcnt = 15;
+	double hpx[100] = {
+		30, 27, 25, 23, 20, 17, 17, 16, 16, 16, 17, 18, 22, 25, 30};
+	double hpy[100] = {
+		34, 70, 105, 142, 179, 216, 254, 292, 329, 367, 406, 444, 518, 592, 663};
+
+	Point hp[100];
+	Point vp[100];
+
+	// 赋值
+	int i;
+	for (i = 0; i < hpcnt; i++)
+	{
+		hp[i].x = hpx[i] - halfImgW;
+		hp[i].y = hpy[i] - halfImgH;
+	}
+	for (i = 0; i < vpcnt; i++)
+	{
+		vp[i].x = vpx[i] - halfImgW;
+		vp[i].y = vpy[i] - halfImgH;
+	}
+
+	int calcCnt = 0;
+	double vk1, vk2;
+	double finalhk1, finalvk1, finalk1;
+	double vk1Left, vk1Right;
+
+	Point endp1, endp2;
+	double p1R2, p1R4;
+	double p2R2, p2R4;
+	double mpR2, mpR4;
+	double lineDisNumerator, p0DisNumerator;
+	double lineDisDenominator;
+	double xb, yb, xe, ye, xm, ym;
+	double totalD, curD;
+	double lastDis = -1;
+	double thresh;
+
+	// 端点赋值
+	endp1.x = hp[0].x;
+	endp1.y = hp[0].y;
+	endp2.x = hp[hpcnt-1].x;
+	endp2.y = hp[hpcnt-1].y;
+
+
+	// 计算距离原点距离平方
+	p1R2 = pointDisPower2(&p0, &endp1);
+	p2R2 = pointDisPower2(&p0, &endp2);
+	p1R4 = p1R2 * p1R2;
+	p2R4 = p2R2 * p2R2;
+
+	calcCnt = 0;
+	thresh = 10;
+	vk1Left = 0;
+	vk1Right = 10;
+	vk2 = 0; // 不计算k2
+	while (vk1Left < vk1Right)
+	{
+		calcCnt++;
+		totalD = 0.;
+
+		vk1 = (vk1Left + vk1Right) / 2;
+
+		// 校正后直线端点
+		xb = CORRECT_COOR(endp1.x, vk1, p1R2, vk2, p1R4);
+		yb = CORRECT_COOR(endp1.y, vk1, p1R2, vk2, p1R4);
+		xe = CORRECT_COOR(endp2.x, vk1, p2R2, vk2, p2R4);
+		ye = CORRECT_COOR(endp2.y, vk1, p2R2, vk2, p2R4);
+
+		// 计算原点与直线的关系
+		p0DisNumerator = ((ye - yb) * p0.x -
+				(xe - xb) * p0.y +
+				((xe - xb) * yb - (ye - yb) * xb));
+
+		// 计算直线距离的分母
+		lineDisDenominator = sqrt((ye - yb) * (ye - yb) + (xe - xb) * (xe - xb));
+		for (i = 1; i < hpcnt - 1; i++)
+		{
+
+			mpR2 = pointDisPower2(&p0, &hp[i]);
+			mpR4 = mpR2 * mpR2;
+			xm = CORRECT_COOR(hp[i].x, vk1, mpR2, vk2, mpR4);
+			ym = CORRECT_COOR(hp[i].y, vk1, mpR2, vk2, mpR4);
+			//xm = hp[i].x;
+			//ym = hp[i].y;
+			lineDisNumerator = ((ye - yb) * xm -
+				(xe - xb) * ym +
+				((xe - xb) * yb - (ye - yb) * xb));
+			/*
+			curD = (lineDisNumerator) / lineDisDenominator;
+			totalD += curD;
+			*/
+			curD = fabs(lineDisNumerator) / lineDisDenominator;
+
+			if (SAME_SIDE_WITH_P0(p0DisNumerator, lineDisNumerator))
+			{
+				totalD -= curD;
+			}
+			else
+			{
+				totalD += curD;
+			}
+		}
+	
+		finalhk1 = vk1;
+		if (fabs(totalD) <= 1e-20)
+		{
+			break;
+		}
+
+		if (calcCnt >= 5000)
+		{
+			break;
+		}
+
+		// 默认为桶形畸变
+		// k1太大，导致矫正点与原点在同一侧
+		if (totalD < 0)
+		{
+			vk1Right = vk1;
+		}
+		else
+		{
+			vk1Left = vk1;
+		}
+	}
+
+	*k1 = finalhk1;
+
+	return PANORAMA_OK;
+}
+
 /* 矫正 */
 int undistort(double k, double k2, Image *src, Image **dstImg)
 {

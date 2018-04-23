@@ -64,6 +64,7 @@ int keypointVectorPush(Vector *vPtr, float x, float y, float size,
 		float angle, float response, int octave, int classId);
 
 int distortCalcK1K2(double distortLevel, int W, int H, double *k1, double *k2);
+int calcK1(double *k1);
 int undistort(double k, double k2, Image *src, Image **dst);
 float pointDisPower2(Point *p1, Point *p2 );
 

@@ -433,8 +433,6 @@ int PanoramaProcess (PANORAMA_CTX *ctx)
 			panoW = img->w;
 			panoH = img->h;
 
-			Dbg("pano.wh = %d, %d\n", panoW, panoH);
-
 			ret = constructImage(&img, NULL, NULL, 0, panoW,
 				panoH, inCtx->images[0].imgFmt, BUF_TYPE_NOBUF);
 			if (PANORAMA_OK != ret)
