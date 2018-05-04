@@ -2,9 +2,10 @@
 #define __PANORAMA_FEATURES2D_H__
 
 #include <math.h>
-#include "utils.h"
-#include "matrix.h"
-#include "vector.h"
+#include "panorama_utils.h"
+#include "panorama_image.h"
+#include "panorama_matrix.h"
+#include "panorama_vector.h"
 
 #define MAX_KEYPOINTS_NUM 1000
 #define MAX_DESCRIPTOR_NUM 1000
@@ -63,9 +64,7 @@ int keypointAssignment(KeyPoint *kp, float x, float y, float size,
 int keypointVectorPush(Vector *vPtr, float x, float y, float size,
 		float angle, float response, int octave, int classId);
 
-int distortCalcK1K2(double distortLevel, int W, int H, double *k1, double *k2);
-int calcK1(double *k1);
-int undistort(double k, double k2, Image *src, Image **dst);
+
 float pointDisPower2(Point *p1, Point *p2 );
 
 #endif // __PANORAMA_FEATURES2D_H__

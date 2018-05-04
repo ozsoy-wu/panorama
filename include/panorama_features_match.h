@@ -3,7 +3,7 @@
 
 #include "panorama.h"
 
-int knnMatcher();
+int matchKnn();
 
 #endif //__PANORAMA_FEATURES_MATCH_H__
 

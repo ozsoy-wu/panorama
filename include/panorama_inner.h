@@ -3,13 +3,13 @@
 
 #include <sys/queue.h>
 
-#include "log.h"
-#include "utils.h"
-#include "vector.h"
-#include "features2d.h"
-#include "matrix.h"
-#include "surf.h"
-#include "features_match.h"
+#include "panorama_log.h"
+#include "panorama_utils.h"
+#include "panorama_vector.h"
+#include "panorama_features2d.h"
+#include "panorama_matrix.h"
+#include "panorama_surf.h"
+#include "panorama_features_match.h"
 
 #define MAX_IMAGE_NUM 12
 
@@ -17,7 +17,9 @@ typedef enum INNER_STATUS_E {
 	STATUS_PREPARE = 0,
 	STATUS_INIT,
 	STATUS_NEW_IMAGE,
+#ifdef UNDISTORT_SUPPORT
 	STATUS_UNDISTORT_IMAGE,
+#endif
 #ifdef FEATURE_BASE
 	STATUS_FEATURE_DETECT,
 	STATUS_FEATURE_COMPUTE,
@@ -54,7 +56,7 @@ typedef struct PANORAMA_INNER_CTX_S
 	int stitchInterpolationWidth;	/* 线性插值算法参数，对重合区域的n%进行插值，n即为本参数 */
 
 	PANORAMA_CFG cfg;
-	Image images[MAX_IMAGE_NUM];	/* 原始图片数据 */
+	Image *images[MAX_IMAGE_NUM];	/* 图片数据 */
 	Image pano;	/* 全景图 */
 
 	Vector *kpVecPtr[MAX_IMAGE_NUM];	/* 每张图片的特征点 */

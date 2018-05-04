@@ -16,7 +16,7 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-#define MALLOC(cnt, type) malloc((cnt) * sizeof(type)) 
+#define MALLOC(cnt, type) malloc((cnt) * sizeof(type))
 
 /* malloc memmory with length, and convert to specif type. */
 #define lMalloc(type, len) ( (type *)malloc(len))
@@ -29,6 +29,7 @@
 } while (0)
 
 #define FLOAT_EQUAL(a, b) (fabs((a) - (b)) <= 1e-5)
+#define ANGLE2RADIAN(a) (PANORAMA_2PI * (a) / 360)
 
 int cvRound( double value );
 

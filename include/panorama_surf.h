@@ -1,8 +1,8 @@
 #ifndef __PANORAMA_SURF_H__
 #define __PANORAMA_SURF_H__
 
-#include "features2d.h"
-#include "matrix.h"
+#include "panorama_features2d.h"
+#include "panorama_matrix.h"
 
 typedef struct SURF_CFG_S
 {

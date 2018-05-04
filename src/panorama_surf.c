@@ -1,3 +1,13 @@
+/******************************************************************************
+ * Copyright (c) 2015-2018 TP-Link Technologies CO.,LTD.
+ *
+ * 文件名称:		panorama_surf.c
+ * 版           本:	1.0
+ * 摘           要:	surf提取/描述特征点算法
+ * 作           者:	wupimin<wupimin@tp-link.com.cn>
+ * 创建时间:		2018-04-28
+ ******************************************************************************/
+
 #include <stdio.h>
 #include <math.h>
 #include "panorama_inner.h"
@@ -72,7 +82,7 @@ static void calcLayerDetAndTrace( Mat* sum, int size, int sampleStep,
     resizeHaarPattern( dy_s , &Dy , CALC_DET_TRACE_NY , 9, size, sum->cols );
     resizeHaarPattern( dxy_s, &Dxy, CALC_DET_TRACE_NXY, 9, size, sum->cols );
 
-    /* The integral image 'sum' is one pixel bigger than the source image */
+    /* The matIntegral image 'sum' is one pixel bigger than the source image */
     int samples_i = 1+(sum->rows-1-size)/sampleStep;
     int samples_j = 1+(sum->cols-1-size)/sampleStep;
 
@@ -170,7 +180,7 @@ static void findMaximaInLayer( Mat *sum, Mat *mask_sum,
 
 	int size = sizes[layer];
 
-	// The integral image 'sum' is one pixel bigger than the source image
+	// The matIntegral image 'sum' is one pixel bigger than the source image
 	int layer_rows = (sum->rows-1)/sampleStep;
 	int layer_cols = (sum->cols-1)/sampleStep;
 
@@ -247,7 +257,7 @@ static void findMaximaInLayer( Mat *sum, Mat *mask_sum,
 					/* Calculate the wavelet center coordinates for the maxima */
 					float center_i = sum_i + (size-1)*0.5f;
 					float center_j = sum_j + (size-1)*0.5f;
-					
+
 					keypointAssignment(&kp, center_j, center_i, (float)sizes[layer],
 						-1, val0, octave, (trace_ptr[j] > 0) - (trace_ptr[j] < 0) );
 
@@ -303,19 +313,19 @@ static int fastHessianDetector (Mat *sum, Mat *mask_sum, Vector *kpVecPtr,
 	{
 		for(layer = 0; layer < nOctaveLayers+2; layer++ )
 		{
-			/* The integral image sum is one pixel bigger than the source image*/
+			/* The matIntegral image sum is one pixel bigger than the source image*/
 			col = (sum->cols-1)/step;
 			row = (sum->rows-1)/step;
 
-			// TODO first parameter OK? 
-			ret = constructMat(&dets[index], col, row, 1, sizeof(float), NULL);
+			// TODO first parameter OK?
+			ret = matConstruct(&dets[index], col, row, 1, sizeof(float), NULL);
 			if (PANORAMA_OK != ret)
 			{
 				ret = PANORAMA_ERROR;
 				goto exit;
 			}
 
-			ret = constructMat(&traces[index], col, row, 1, sizeof(float), NULL);
+			ret = matConstruct(&traces[index], col, row, 1, sizeof(float), NULL);
 			if (PANORAMA_OK != ret)
 			{
 				ret = PANORAMA_ERROR;
@@ -370,8 +380,8 @@ static int fastHessianDetector (Mat *sum, Mat *mask_sum, Vector *kpVecPtr,
 exit:
 	for (i = 0; i < nTotalLayers; i++)
 	{
-		destructMat(&dets[i]);
-		destructMat(&traces[i]);
+		matDestruct(&dets[i]);
+		matDestruct(&traces[i]);
 	}
 
 	return ret;
@@ -498,24 +508,24 @@ int surfFeatureDetect(SURF_CFG *cfg, Image *img, Vector *kp)
 		return PANORAMA_ERROR;
 	}
 
-	ret = constructMat(&srcImg, img->w, img->h, 1, sizeof(unsigned char), img->data[0]);
+	ret = matConstruct(&srcImg, img->w, img->h, 1, sizeof(unsigned char), img->data[0]);
 	if (ret != PANORAMA_OK)
 	{
 		goto out;
 	}
 
-	ret = constructMat(&sumImg, img->w + 1, img->h + 1, 1, sizeof(int), NULL);
+	ret = matConstruct(&sumImg, img->w + 1, img->h + 1, 1, sizeof(int), NULL);
 	if (ret != PANORAMA_OK)
 	{
 		goto out;
 	}
 
-	integral (srcImg, sumImg);
+	matIntegral (srcImg, sumImg);
 	fastHessianDetector(sumImg, sumImg, kp, cfg->nOctaves, cfg->nOctaveLayers, (float)cfg->hessianThreshold);
 
 out:
-	destructMat(&srcImg);
-	destructMat(&sumImg);
+	matDestruct(&srcImg);
+	matDestruct(&sumImg);
 
 	return ret;
 }
@@ -546,7 +556,7 @@ int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 
 	if (NULL == *kpdes)
 	{
-		if (PANORAMA_ERROR == constructMat(kpdes, desCols, N, 1, sizeof(float), NULL))
+		if (PANORAMA_ERROR == matConstruct(kpdes, desCols, N, 1, sizeof(float), NULL))
 		{
 			return PANORAMA_ERROR;
 		}
@@ -556,7 +566,7 @@ int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 	//const int nOriSampleBound = (2*ORI_RADIUS+1)*(2*ORI_RADIUS+1);
 	int nOriSamples = 0;
 	Vector *apt = NULL;
-	if (PANORAMA_OK != constructVector(&apt, sizeof(Point), nOriSampleBound))
+	if (PANORAMA_OK != vectorConstruct(&apt, sizeof(Point), nOriSampleBound))
 	{
 		ret = PANORAMA_ERROR;
 		goto cleanup;
@@ -569,7 +579,7 @@ int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 	Mat *G_ori = NULL;
 	Mat *G_desc = NULL;
 
-	constructMat(&G_ori, 1, 2*ORI_RADIUS+1, 1, sizeof(float), NULL);
+	matConstruct(&G_ori, 1, 2*ORI_RADIUS+1, 1, sizeof(float), NULL);
 
 	/* Coordinates and weights of samples used to calculate orientation */
 	getGaussianKernel(G_ori, 2*ORI_RADIUS+1, SURF_ORI_SIGMA);
@@ -597,10 +607,9 @@ int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 		goto cleanup;
 	}
 
-	float *dwP = NULL;
 	float *gdesP0 = NULL;
 	float *gdesP1 = NULL;
-	constructMat(&G_desc, 1, PATCH_SZ, 1, sizeof(float), NULL);
+	matConstruct(&G_desc, 1, PATCH_SZ, 1, sizeof(float), NULL);
 	for(i = 0; i < PATCH_SZ; i++ )
 	{
 		for(j = 0; j < PATCH_SZ; j++)
@@ -626,7 +635,7 @@ int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 	//unsigned char PATCH[PATCH_SZ+1][PATCH_SZ+1];
 	float DX[PATCH_SZ][PATCH_SZ], DY[PATCH_SZ][PATCH_SZ];
 	Mat *_patch = NULL;
-	constructMat(&_patch, PATCH_SZ+1, PATCH_SZ+1, 1, sizeof(unsigned char), NULL);
+	matConstruct(&_patch, PATCH_SZ+1, PATCH_SZ+1, 1, sizeof(unsigned char), NULL);
 	for (i = 0; i < N; i++)
 	{
 		curkp = (KeyPoint *)VECTOR_AT(kp, i);
@@ -641,19 +650,19 @@ int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 	Mat *srcImg = NULL;
 	Mat *sumImg = NULL;
 
-	ret = constructMat(&srcImg, img->w, img->h, 1, sizeof(unsigned char), img->data[0]);
+	ret = matConstruct(&srcImg, img->w, img->h, 1, sizeof(unsigned char), img->data[0]);
 	if (ret != PANORAMA_OK)
 	{
 		goto cleanup;
 	}
 
-	ret = constructMat(&sumImg, img->w + 1, img->h + 1, 1, sizeof(int), NULL);
+	ret = matConstruct(&sumImg, img->w + 1, img->h + 1, 1, sizeof(int), NULL);
 	if (ret != PANORAMA_OK)
 	{
 		goto cleanup;
 	}
 
-	integral(srcImg, sumImg); // TODO, 这里可以复用detect函数的结果
+	matIntegral(srcImg, sumImg); // TODO, 这里可以复用detect函数的结果
 	for (k = 0; k < N; k++)
 	{
 		float *vec;
@@ -664,7 +673,7 @@ int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 		/* To find the dominant orientation, the gradients in x and y are
 		 * sampled in a circle of radius 6s using wavelets of size 4s.
 		 * We ensure the gradient wavelet size is even to ensure the
-		 * wavelet pattern is balanced and symmetric around its center 
+		 * wavelet pattern is balanced and symmetric around its center
 		 */
 		int grad_wav_size = 2*cvRound( 2*s );
 
@@ -718,7 +727,7 @@ int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 			// TODO 计算角度
 			// phase( Mat(1, nangle, CV_32F, X), Mat(1, nangle, CV_32F, Y), Mat(1, nangle, CV_32F, angle), true );
 			fastAtan(X, Y, angle, nangle, 1);
-		
+
 			float bestx = 0, besty = 0, descriptor_mod = 0;
 			for( i = 0; i < 360; i += SURF_ORI_SEARCH_INC )
 			{
@@ -753,7 +762,7 @@ int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 		}
 
 		Mat *win = NULL;
-		constructMat(&win, win_size, win_size, 1, sizeof(unsigned char), NULL);
+		matConstruct(&win, win_size, win_size, 1, sizeof(unsigned char), NULL);
 
 		if( 0 == cfg->upright )
 		{
@@ -834,8 +843,8 @@ int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 		// Scale the window to size PATCH_SZ so each pixel's size is s. This
 		// makes calculating the gradients with wavelets of size 2s easy
 
-		// TODO, 检查resize函数是否工作正常 
-		resizeMat(win, _patch, (double)(_patch->cols / (double)win->cols), (double)(_patch->rows / (double)win->rows), INTER_NEAREST);
+		// TODO, 检查resize函数是否工作正常
+		matResize(win, _patch, (double)(_patch->cols / (double)win->cols), (double)(_patch->rows / (double)win->rows), INTER_NEAREST);
 		// resize(win, _patch, _patch.size(), 0, 0, INTER_AREA);
 
 		// Calculate gradients in x and y with wavelets of size 2s
@@ -930,12 +939,12 @@ int surfFeatureCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpdes)
 
 
 cleanup:
-	destructMat(&sumImg);
-	destructMat(&srcImg);
-	destructMat(&_patch);
-	destructMat(&G_desc);
-	destructMat(&G_ori);
-	destructVector(&apt);
+	matDestruct(&sumImg);
+	matDestruct(&srcImg);
+	matDestruct(&_patch);
+	matDestruct(&G_desc);
+	matDestruct(&G_ori);
+	vectorDestruct(&apt);
 
 	return ret;
 }
@@ -960,19 +969,19 @@ int surfFeatureDetectAndCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpd
 		return PANORAMA_ERROR;
 	}
 
-	ret = constructMat(&srcImg, img->w, img->h, 1, sizeof(unsigned char), img->data[0]);
+	ret = matConstruct(&srcImg, img->w, img->h, 1, sizeof(unsigned char), img->data[0]);
 	if (ret != PANORAMA_OK)
 	{
 		goto out;
 	}
 
-	ret = constructMat(&sumImg, img->w + 1, img->h + 1, 1, sizeof(int), NULL);
+	ret = matConstruct(&sumImg, img->w + 1, img->h + 1, 1, sizeof(int), NULL);
 	if (ret != PANORAMA_OK)
 	{
 		goto out;
 	}
 
-	integral (srcImg, sumImg);
+	matIntegral (srcImg, sumImg);
 	//PRINT(Mat, srcImg);
 	//PRINT(Mat, sumImg);
 	fastHessianDetector(sumImg, sumImg, kp, cfg->nOctaves, cfg->nOctaveLayers, (float)cfg->hessianThreshold);
@@ -980,8 +989,8 @@ int surfFeatureDetectAndCompute(SURF_CFG *cfg, Image *img, Vector *kp, Mat **kpd
 	surfFeatureCompute(cfg, img, kp, kpdes);
 
 out:
-	destructMat(&srcImg);
-	destructMat(&sumImg);
+	matDestruct(&srcImg);
+	matDestruct(&sumImg);
 
 	return ret;
 }

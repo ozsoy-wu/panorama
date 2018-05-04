@@ -1,6 +1,16 @@
+/******************************************************************************
+ * Copyright (c) 2015-2018 TP-Link Technologies CO.,LTD.
+ *
+ * 文件名称:		panorama_stitch.c
+ * 版           本:	1.0
+ * 摘           要:	图像融合算法
+ * 作           者:	wupimin<wupimin@tp-link.com.cn>
+ * 创建时间:		2018-04-28
+ ******************************************************************************/
+
 #include <stdio.h>
 
-#include "stitch.h"
+#include "panorama_stitch.h"
 
 int stitch(PANORAMA_INNER_CTX *innerCtx, int idx)
 {
@@ -41,7 +51,7 @@ int stitch(PANORAMA_INNER_CTX *innerCtx, int idx)
 
 	overlap = innerCtx->stitchOverlapWidth;
 	stitchWitdh = innerCtx->stitchInterpolationWidth;
-	curImage = &innerCtx->images[idx];
+	curImage = innerCtx->images[idx];
 	tw = innerCtx->pano.w;
 	th = innerCtx->pano.h;
 	curImageStart = idx * (curImage->w - overlap);

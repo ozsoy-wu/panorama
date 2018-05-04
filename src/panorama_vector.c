@@ -1,9 +1,19 @@
-#include "log.h"
-#include "utils.h"
-#include "vector.h"
+/******************************************************************************
+ * Copyright (c) 2015-2018 TP-Link Technologies CO.,LTD.
+ *
+ * 文件名称:		panorama_vector.c
+ * 版           本:	1.0
+ * 摘           要:	vector容器，元素可以动态增长
+ * 作           者:	wupimin<wupimin@tp-link.com.cn>
+ * 创建时间:		2018-04-28
+ ******************************************************************************/
+
+#include "panorama_log.h"
+#include "panorama_utils.h"
+#include "panorama_vector.h"
 #include "panorama.h"
 
-int constructVector(Vector **vPtr, int elemSize, int capacity)
+int vectorConstruct(Vector **vPtr, int elemSize, int capacity)
 {
 	if (!vPtr)
 	{
@@ -66,7 +76,7 @@ unsigned char *vectorGetAndReserveTail(Vector *vPtr)
 		{
 			oldSize = vPtr->capacity * vPtr->elemSize;
 			newSize = oldSize<<1;
-			vPtr->elemArray = (unsigned char *)realloc(vPtr->elemArray, newSize); 
+			vPtr->elemArray = (unsigned char *)realloc(vPtr->elemArray, newSize);
 			if (!vPtr->elemArray)
 			{
 				return NULL;
@@ -96,7 +106,7 @@ unsigned char *vectorPop(Vector *vPtr)
 		return NULL;
 	}
 
-	res = (unsigned char *)vPtr->elemArray + (vPtr->size - 1) * vPtr->elemSize;	
+	res = (unsigned char *)vPtr->elemArray + (vPtr->size - 1) * vPtr->elemSize;
 	vPtr->size--;
 
 	return res;
@@ -116,7 +126,7 @@ int vectorResize(Vector *vPtr, int newCapa)
 
 	if (newSize > oldSize)
 	{
-		vPtr->elemArray = (unsigned char *)realloc(vPtr->elemArray, newSize); 
+		vPtr->elemArray = (unsigned char *)realloc(vPtr->elemArray, newSize);
 		if (!vPtr->elemArray)
 		{
 			return PANORAMA_ERROR;
@@ -135,19 +145,20 @@ int vectorResize(Vector *vPtr, int newCapa)
 	return PANORAMA_OK;
 }
 
-int destructVector(Vector **vPtr)
+int vectorDestruct(Vector **vPtr)
 {
 	if (vPtr && *vPtr)
 	{
 		if ((*vPtr)->dataNeedFree)
 		{
+			(*vPtr)->dataNeedFree = 0;
 			FREE((*vPtr)->elemArray);
 		}
 
 		if ((*vPtr)->selfNeedFree)
 		{
+			(*vPtr)->selfNeedFree = 0;
 			FREE(*vPtr);
-			*vPtr = NULL;
 		}
 	}
 

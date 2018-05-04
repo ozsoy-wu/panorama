@@ -6,8 +6,13 @@ MKDIR=mkdir
 CPPFLAG=-g -Wall -Wextra -fPIC
 LINKFLAG+=-shared
 
-#debug info
+# debug info
 CPPFLAG+=-DDEBUG_FUNC
+
+# 是否支持矫正
+#CPPFLAG+=-DUNDISTORT_SUPPORT
+
+# 是否采用特征点匹配
 #CPPFLAG+=-DFEATURE_BASE
 
 PROJECT_ROOT = $(PWD)
@@ -17,29 +22,24 @@ LIB_FLAGS=-lm
 DEPS = $(INCLUDE_PATH)/common.h
 
 _OBJS :=
-_OBJS += features2d.o
-_OBJS += imgcodec.o
-_OBJS += matrix.o
-_OBJS += vector.o
-_OBJS += utils.o
-_OBJS += log.o
-_OBJS += surf.o
-_OBJS += features_match.o
-_OBJS += stitch.o
+_OBJS += panorama_image.o
+_OBJS += panorama_matrix.o
+_OBJS += panorama_vector.o
+_OBJS += panorama_utils.o
+_OBJS += panorama_log.o
+_OBJS += panorama_surf.o
+_OBJS += panorama_features2d.o
+_OBJS += panorama_features_match.o
+_OBJS += panorama_stitch.o
 _OBJS += panorama.o
-
-_TEST_OBJS = main.o
-TESTNAME = pn
 
 LIBNAMEFORSHORT=panorama
 LIBNAME=lib$(LIBNAMEFORSHORT).so
 OBJDIR = $(PROJECT_ROOT)/obj
 SRCDIR = $(PROJECT_ROOT)/src
 LIBDIR = $(PROJECT_ROOT)/lib
-TESTDIR = $(PROJECT_ROOT)/test
 LIBCONF = /etc/ld.so.conf.d/libpanorama.conf
 OBJS = $(patsubst %, $(OBJDIR)/%, $(_OBJS))
-TEST_OBJS = $(patsubst %, $(OBJDIR)/%, $(_TEST_OBJS))
 
 
 .PHONY: preBuild
@@ -55,7 +55,12 @@ panorama: $(OBJS)
 $(OBJDIR)/%.o: $(SRCDIR)/%.c
 	$(CC) -o $@ -c $< $(CPPFLAG) $(INCLUDE_PATH) $(LIB_FLAGS)
 
-# test functions
+######## test functions #####
+_TEST_OBJS = main.o
+TESTNAME = pn
+TESTDIR = $(PROJECT_ROOT)/test
+TEST_OBJS = $(patsubst %, $(OBJDIR)/%, $(_TEST_OBJS))
+
 test: preBuild panorama pn
 
 pn: $(TEST_OBJS)
@@ -63,7 +68,7 @@ pn: $(TEST_OBJS)
 
 #$(OBJDIR)/$.o: $(TESTDIR)/$.c
 $(OBJDIR)/main.o: $(TESTDIR)/main.c
-	$(CC) -o $@ -c $< $(CPPFLAG) $(INCLUDE_PATH) $(LIB_FLAGS) -l$(LIBNAMEFORSHORT) 
+	$(CC) -o $@ -c $< $(CPPFLAG) $(INCLUDE_PATH) $(LIB_FLAGS) -l$(LIBNAMEFORSHORT)
 
 .PHONY: clean
 clean:

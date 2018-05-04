@@ -1,17 +1,23 @@
+/******************************************************************************
+ * Copyright (c) 2015-2018 TP-Link Technologies CO.,LTD.
+ *
+ * 文件名称:		panorama.c
+ * 版           本:	1.0
+ * 摘           要:	全景图库接口实现
+ * 作           者:	wupimin<wupimin@tp-link.com.cn>
+ * 创建时间:		2018-04-28
+ ******************************************************************************/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 
-#include "panorama_inner.h"
 #include "panorama.h"
-#include "stitch.h"
+#include "panorama_inner.h"
+#include "panorama_stitch.h"
 
 static int ctxCnt = 0;
 int gLogMask;
-
-int srcImgWidth;				/* 原始图属性，宽度 */
-int srcImgHeight;				/* 原始图属性，高度 */
-IMG_FORMAT srcImageFmt; 		/* 原始图属性，格式 */
 
 static int _PanoramaCfgInit(PANORAMA_CFG *cfg)
 {
@@ -28,8 +34,8 @@ static int _PanoramaCfgInit(PANORAMA_CFG *cfg)
 	cfg->camFocalLength = 0;
 	cfg->camDistortionK1 = 0;
 	cfg->camDistortionK2 = 0;
-	cfg->stitchOverlapWidth = -1;
-	cfg->stitchInterpolationPercent = DEFAULT_STITCH_WIDTH_PERCENT;
+	cfg->stitchOverlapPercent = DEFAULT_STITCH_WIDTH_PERCENT;
+	cfg->stitchInterpolationPercent = DEFAULT_INTERPOLATION_WIDTH_PERCENT;
 	cfg->srcImgWidth = -1;
 	cfg->srcImgHeight = -1;
 	cfg->srcImageFmt = IMG_FMT_YUV420P_I420;
@@ -58,6 +64,7 @@ static int _PanoramaCfgCheck(PANORAMA_CFG *cfg)
 		return PANORAMA_ERROR;
 	}
 
+	/*
 	if (FLOAT_EQUAL(cfg->camViewingAngle, 0) || cfg->camViewingAngle < 0)
 	{
 		Log(LOG_ERROR, "Invalid camViewingAngle %10.10f\n", cfg->camViewingAngle);
@@ -69,6 +76,7 @@ static int _PanoramaCfgCheck(PANORAMA_CFG *cfg)
 		Log(LOG_ERROR, "Invalid camViewingAngle %10.10f\n", cfg->camRotateAngle);
 		return PANORAMA_ERROR;
 	}
+	*/
 
 	if (cfg->srcImgWidth <= 0 ||cfg->srcImgHeight <= 0)
 	{
@@ -76,9 +84,9 @@ static int _PanoramaCfgCheck(PANORAMA_CFG *cfg)
 		return PANORAMA_ERROR;
 	}
 
-	if (cfg->stitchInterpolationPercent < 0 || cfg->stitchInterpolationPercent > 100)
+	if (cfg->stitchInterpolationPercent < 0 || cfg->stitchInterpolationPercent > 1)
 	{
-		Log(LOG_ERROR, "Invalid Interpolation Percent %d, should in range [0, 100]\n",
+		Log(LOG_ERROR, "Invalid Interpolation Percent %.10f, should in range [0, 1]\n",
 			cfg->stitchInterpolationPercent);
 		return PANORAMA_ERROR;
 	}
@@ -167,10 +175,7 @@ int PanoramaGetCfg (PANORAMA_CTX *ctx, PANORAMA_CFG *cfg)
 int PanoramaSetCfg (PANORAMA_CTX *ctx, PANORAMA_CFG *cfg)
 {
 	int ret;
-	double k1, k1FromLevel, k2FromLevel;
-	double p1R2, p1R4;
-	int midW, midH;
-	Point p0, p1;
+	int midW, midH, topW, topH;
 
 	if (!ctx || !cfg)
 	{
@@ -186,13 +191,19 @@ int PanoramaSetCfg (PANORAMA_CTX *ctx, PANORAMA_CFG *cfg)
 		return PANORAMA_ERROR;
 	}
 
+#ifdef SUPPORT_UNDISTORT
+	double k1, k1FromLevel, k2FromLevel;
+	double p1R2, p1R4;
+	double p2R2, p2R4;
+	Point p0, p1, p2;
+
 	if (FLOAT_EQUAL(cfg->camDistortionK1, -1))
 	{
-		distortCalcK1K2(-0.00857, cfg->srcImgWidth,
+		ret = distortCalcK1K2(-0.00857, cfg->srcImgWidth,
 			cfg->srcImgHeight, &k1FromLevel, &k2FromLevel);
 		if (PANORAMA_OK != ret)
 		{
-			Log(LOG_ERROR, "calcK1 failed\n");
+			Log(LOG_ERROR, "distortCalcK1K2 failed\n");
 			return PANORAMA_ERROR;
 		}
 
@@ -204,40 +215,44 @@ int PanoramaSetCfg (PANORAMA_CTX *ctx, PANORAMA_CFG *cfg)
 	p0.y = 0;
 	p1.x = cfg->srcImgWidth / 2;
 	p1.y = cfg->srcImgHeight / 2;
+	p2.x = cfg->srcImgWidth / 2;
+	p2.y = 0;
 	p1R2 = pointDisPower2(&p0, &p1);
 	p1R4 = p1R2 * p1R2;
+	p2R2 = pointDisPower2(&p1, &p2);
+	p2R4 = p2R2 * p2R2;
 
 	/* 矫正后的图像分辨率 */
-	midW = 2 * ceil(CORRECT_COOR(p1.x, cfg->camDistortionK1, p1R2, cfg->camDistortionK2, p1R4));
-	midH = 2 * ceil(CORRECT_COOR(p1.y, cfg->camDistortionK1, p1R2, cfg->camDistortionK2, p1R4));
-	inCtx->undistortImgW = midW;
-	inCtx->undistortImgH = midH;
+	topW = 2 * ceil(CORRECT_COOR(p1.x, cfg->camDistortionK1, p1R2, cfg->camDistortionK2, p1R4));
+	topH = 2 * ceil(CORRECT_COOR(p1.y, cfg->camDistortionK1, p1R2, cfg->camDistortionK2, p1R4));
+	inCtx->undistortImgW = topW;
+	inCtx->undistortImgH = topH;
+
+	midW = 2 * ceil(CORRECT_COOR(p2.x, cfg->camDistortionK1, p2R2, cfg->camDistortionK2, p2R4));
+	midH = 2 * ceil(CORRECT_COOR(p2.y, cfg->camDistortionK1, p2R2, cfg->camDistortionK2, p2R4));
+#else
+	topW = midW = cfg->srcImgWidth;
+	topH = midH = cfg->srcImgHeight;
+#endif
 
 	/* 计算重合区域宽度 */
-	if (cfg->stitchOverlapWidth == -1){
-		inCtx->stitchOverlapWidth = ceil((midW * (cfg->camViewingAngle - cfg->camRotateAngle)) / cfg->camViewingAngle);
-		if (inCtx->stitchOverlapWidth & 0x1)
-		{
-			inCtx->stitchOverlapWidth--;
-		}
-	}
-	else
+	inCtx->stitchOverlapWidth = ceil(midW * cfg->stitchOverlapPercent);
+	inCtx->stitchOverlapWidth += (topW - midW);
+	if (inCtx->stitchOverlapWidth & 0x1)
 	{
-		inCtx->stitchOverlapWidth = cfg->stitchOverlapWidth;
+		inCtx->stitchOverlapWidth--;
 	}
 
 	/* 计算插值宽度 */
-	inCtx->stitchInterpolationWidth = ceil(inCtx->stitchOverlapWidth * cfg->stitchInterpolationPercent / 100);
+	inCtx->stitchInterpolationWidth = ceil(inCtx->stitchOverlapWidth * cfg->stitchInterpolationPercent);
 	if (inCtx->stitchInterpolationWidth & 0x1)
 	{
 		inCtx->stitchInterpolationWidth--;
 	}
 
-	Dbg("sw%d, iw%d\n", inCtx->stitchOverlapWidth, inCtx->stitchInterpolationWidth);
-
 	/* pano */
-	inCtx->pano.w = cfg->commonImgTotalNum * midW - (cfg->commonImgTotalNum - 1) * inCtx->stitchOverlapWidth;
-	inCtx->pano.h = midH;
+	inCtx->pano.w = cfg->commonImgTotalNum * topW - (cfg->commonImgTotalNum - 1) * inCtx->stitchOverlapWidth;
+	inCtx->pano.h = topH;
 
 	memcpy(&inCtx->cfg, cfg, sizeof(PANORAMA_CFG));
 	gLogMask = cfg->commonLogMask;
@@ -253,8 +268,6 @@ int PanoramaLoadSrcImgFile (PANORAMA_CTX *ctx, char *filename, int imgWidth, int
 	int idx;
 	unsigned char *imgBuf = NULL;
 	FILE *fp;
-	Image *curImage = NULL;
-	Image *srcImage = NULL;
 	PANORAMA_INNER_CTX *inCtx = NULL;
 
 	if (!ctx || !filename)
@@ -265,7 +278,6 @@ int PanoramaLoadSrcImgFile (PANORAMA_CTX *ctx, char *filename, int imgWidth, int
 	inCtx = GET_INNER_CTX(ctx);
 
 	idx = inCtx->imgNum;
-	curImage = &(inCtx->images[idx]);
 
 	if (IMG_FMT_YUV420P_I420 == format)
 	{
@@ -294,27 +306,12 @@ int PanoramaLoadSrcImgFile (PANORAMA_CTX *ctx, char *filename, int imgWidth, int
 		}
 
 		/* 原始图数据 */
-		ret = constructImage(&srcImage, (unsigned char *)&imgBuf, &imgTotalSize, 1, imgWidth,
+		ret = imageConstruct(&inCtx->images[idx], (unsigned char *)&imgBuf, &imgTotalSize, 1, imgWidth,
 			imgHeight, format, BUF_TYPE_NOCOPY_DELETE);
 		if (PANORAMA_OK != ret)
 		{
 			goto clean;
 		}
-
-		/* 校正 */
-		undistort(inCtx->cfg.camDistortionK1, inCtx->cfg.camDistortionK2, srcImage, &curImage);
-
-		// TODO delete
-		FILE *rfp = NULL;
-		int i;
-		char fnn[250]={0};
-		sprintf(fnn, "%s_ad_%d-%d.yuv", filename, curImage->w, curImage->h);
-		rfp = fopen(fnn, "w+");
-		for (i = 0; i < curImage->dataBlocks; i++)
-		{
-			fwrite(curImage->data[i],curImage->dataSize[i], 1, rfp);
-		}
-		fclose(rfp);
 
 		inCtx->imgNum++;
 	}
@@ -323,14 +320,14 @@ int PanoramaLoadSrcImgFile (PANORAMA_CTX *ctx, char *filename, int imgWidth, int
 		// TODO
 	}
 
-	return PANORAMA_OK;
-clean:
-	if (imgBuf)
-	{
-		FREE(imgBuf);
-	}
+	ret = PANORAMA_OK;
 
-	destructImage(&srcImage);
+clean:
+	if (fp)
+	{
+		fclose(fp);
+		fp = NULL;
+	}
 
 	return ret;
 }
@@ -345,23 +342,19 @@ int PanoramaLoadSrcImgBuffer (PANORAMA_CTX *ctx, char **buf,
 
 	int ret;
 	int idx;
-	Image *curImage = NULL;
-	Image *srcImage = NULL;
 	PANORAMA_INNER_CTX *inCtx = NULL;
 
 	inCtx = GET_INNER_CTX(ctx);
-
 	idx = inCtx->imgNum;
-	curImage = &(inCtx->images[idx]);
 
 	if (copy)
 	{
-		ret = constructImage(&srcImage, buf, bufSize, bufCnt, imgWidth,
+		ret = imageConstruct(&inCtx->images[idx], buf, bufSize, bufCnt, imgWidth,
 			imgHeight, format, BUF_TYPE_COPY_NODELETE);
 	}
 	else
 	{
-		ret = constructImage(&srcImage, buf, bufSize, bufCnt, imgWidth,
+		ret = imageConstruct(&inCtx->images[idx], buf, bufSize, bufCnt, imgWidth,
 			imgHeight, format, BUF_TYPE_NOCOPY_NODELETE);
 	}
 
@@ -371,14 +364,10 @@ int PanoramaLoadSrcImgBuffer (PANORAMA_CTX *ctx, char **buf,
 		goto clean;
 	}
 
-	/* 校正 */
-	undistort(inCtx->cfg.camDistortionK1, inCtx->cfg.camDistortionK2, srcImage, &curImage);
-
 	inCtx->imgNum++;
 	ret = PANORAMA_OK;
 
 clean:
-	destructImage(&srcImage);
 
 	return ret;
 
@@ -391,8 +380,9 @@ int PanoramaProcess (PANORAMA_CTX *ctx)
 	int percent;
 	int currentStep = 0;
 	int totalStep = 0;
-	double k1FromLevel, k2FromLevel, k1FromPoint;
 	Image *img = NULL;
+	Image *srcImg = NULL;
+	Image *undistortImg = NULL;
 	INNER_STATUS status;
 
 	if (!ctx)
@@ -433,8 +423,8 @@ int PanoramaProcess (PANORAMA_CTX *ctx)
 			panoW = img->w;
 			panoH = img->h;
 
-			ret = constructImage(&img, NULL, NULL, 0, panoW,
-				panoH, inCtx->images[0].imgFmt, BUF_TYPE_NOBUF);
+			ret = imageConstruct(&img, NULL, NULL, 0, panoW,
+				panoH, inCtx->cfg.panoImageFmt, BUF_TYPE_NOBUF);
 			if (PANORAMA_OK != ret)
 			{
 				Log(LOG_ERROR, "Construct panorama image failed\n");
@@ -459,17 +449,33 @@ int PanoramaProcess (PANORAMA_CTX *ctx)
 				ret = PANORAMA_PROCESS_FINISH;
 				goto out;
 			}
-
-			inCtx->status = STATUS_UNDISTORT_IMAGE;
+			inCtx->status++;
 			break;
+
+#ifdef UNDISTORT_SUPPORT
 		case STATUS_UNDISTORT_IMAGE:
 			/* 校正 */
-			//undistort(inCtx->cfg.camDistortionK1, inCtx->cfg.camDistortionK2, srcImage, &curImage);
-#ifdef FEATURE_BASE
-			inCtx->status = STATUS_FEATURE_DETECT;
+			srcImg = inCtx->images[inCtx->imgToBeHandle];
+			if (PANORAMA_OK != imageUndistort(inCtx->cfg.camDistortionK1, inCtx->cfg.camDistortionK2,
+				srcImg, &undistortImg))
+			{
+				Log(LOG_ERROR, "image#%d: undistort failed\n", inCtx->imgToBeHandle);
+				ret = PANORAMA_PROCESS_ERROR;
+				goto out;
+			}
+
+			/* 释放原始图 */
+			imageDestruct(&srcImg);
+
+			/* 将矫正后的图像指针更新到inner context中 */
+			inCtx->images[inCtx->imgToBeHandle] = undistortImg;
+
+			inCtx->status++;
 			break;
+#endif
+#ifdef FEATURE_BASE
 		case STATUS_FEATURE_DETECT:
- 			ret = constructVector(&(inCtx->kpVecPtr[inCtx->imgToBeHandle]), sizeof(KeyPoint), -1);
+ 			ret = vectorConstruct(&(inCtx->kpVecPtr[inCtx->imgToBeHandle]), sizeof(KeyPoint), -1);
 			if (PANORAMA_OK != ret)
 			{
 				Log(LOG_ERROR, "image#%d: construct keypoint vector failed\n", inCtx->imgToBeHandle);
@@ -479,7 +485,7 @@ int PanoramaProcess (PANORAMA_CTX *ctx)
 
 			ret = inCtx->featureFinder.detect(
 				(SURF_CFG *)inCtx->featureFinder.cfg,
-				&inCtx->images[inCtx->imgToBeHandle],
+				inCtx->images[inCtx->imgToBeHandle],
 				inCtx->kpVecPtr[inCtx->imgToBeHandle]);
 			if (PANORAMA_OK != ret)
 			{
@@ -493,7 +499,7 @@ int PanoramaProcess (PANORAMA_CTX *ctx)
 		case STATUS_FEATURE_COMPUTE:
 			ret = inCtx->featureFinder.compute(
 				(SURF_CFG *)inCtx->featureFinder.cfg,
-				&inCtx->images[inCtx->imgToBeHandle],
+				inCtx->images[inCtx->imgToBeHandle],
 				inCtx->kpVecPtr[inCtx->imgToBeHandle],
 				&inCtx->kpdesVecPtr[inCtx->imgToBeHandle]);
 			if (PANORAMA_OK != ret)
@@ -506,16 +512,13 @@ int PanoramaProcess (PANORAMA_CTX *ctx)
 			inCtx->status = STATUS_FEATURE_MATCH;
 			break;
 		case STATUS_FEATURE_MATCH:
-			ret = knnMatcher();
+			ret = matchKnn();
 			if (PANORAMA_OK != ret)
 			{
 				Log(LOG_ERROR, "feature match failed\n");
 				ret = PANORAMA_PROCESS_ERROR;
 				goto out;
 			}
-			inCtx->status = STATUS_STITCH;
-			break;
-#else
 			inCtx->status = STATUS_STITCH;
 			break;
 #endif
@@ -681,19 +684,18 @@ int PanoramaResetCtx (PANORAMA_CTX *ctx)
 	innerCtx->imgToBeHandle = 0;
 	innerCtx->status = STATUS_PREPARE;
 	innerCtx->totalProcessPercent = 0;
-	
+
 	_PanoramaCfgInit(&innerCtx->cfg);
 
 	for (i = 0; i < MAX_IMAGE_NUM; i++)
 	{
-		imgPtr = &innerCtx->images[i];
-		destructImage(&imgPtr);
-		destructVector(&innerCtx->kpVecPtr[i]);
-		destructMat(&innerCtx->kpdesVecPtr[i]);
+		imageDestruct(&innerCtx->images[i]);
+		vectorDestruct(&innerCtx->kpVecPtr[i]);
+		matDestruct(&innerCtx->kpdesVecPtr[i]);
 	}
 
 	imgPtr = &innerCtx->pano;
-	destructImage(&imgPtr);
+	imageDestruct(&imgPtr);
 
 	return PANORAMA_OK;
 }

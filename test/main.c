@@ -1,5 +1,15 @@
+/******************************************************************************
+ * Copyright (c) 2015-2018 TP-Link Technologies CO.,LTD.
+ *
+ * 文件名称:		main.c
+ * 版           本:	1.0
+ * 摘           要:	全景图库接口测试函数
+ * 作           者:	wupimin<wupimin@tp-link.com.cn>
+ * 创建时间:		2018-04-28
+ ******************************************************************************/
+
 #include <stdlib.h>
-#include <stdio.h> 
+#include <stdio.h>
 
 #include "panorama.h"
 
@@ -14,7 +24,8 @@ int gImgNum = 0;
 int gSrcW = 1280;
 int gSrcH = 720;
 int gOverlap = -1;
-int gStitchWidthPer = 10;
+double gStitchOverlapPer = 0.5;
+double gInterpolationWidthPer = 0.1;
 double gCamFocolLen = 4;
 double gCamVA = 55.5;//56.7; // 55.5
 double gCamRA = 30;
@@ -24,6 +35,8 @@ int gPanoW = 2000;
 int gPanoH = 720;
 
 char fns[20][150] = {0};
+
+#define PMD printf("%s, %d\n", __func__, __LINE__);
 
 static void printUsage()
 {
@@ -38,7 +51,9 @@ static void printUsage()
         "\nStitch flags:\n"
         "  --overlap <int>\n"
         "      Adjacent image overlap width, -1 for self calc\n"
-        "  --stitchw <int>\n"
+        "  --overlapPer <double>\n"
+        "      Adjacent image overlap width percent\n"
+        "  --interPer <double>\n"
         "      Adjacent image linear stitch width.\n"
         "\nCamera Info:\n"
         "  --focalLength <double>\n"
@@ -85,9 +100,14 @@ static int parseCmdArgs(int argc, char** argv)
 			userSetOverlap = 1;
 			i++;
 		}
-		else if (STRINGEQ(argv[i], "--stitchw"))
+		else if (STRINGEQ(argv[i], "--overlapPer"))
 		{
-			gStitchWidthPer = atoi(argv[i+1]);
+			gStitchOverlapPer = atof(argv[i+1]);
+			i++;
+		}
+		else if (STRINGEQ(argv[i], "--interPer"))
+		{
+			gInterpolationWidthPer = atof(argv[i+1]);
 			i++;
 		}
 		else if (STRINGEQ(argv[i], "--focalLength"))
@@ -153,8 +173,13 @@ int main(int argc, char **argv)
 		printf("file#%d: %s\n", i, fns[i]);
 	}
 
+	int ysize, usize, vsize;
 	FILE *fp = NULL;
 	char fn[100] = {0};
+	char * fbuf[3] = {0};
+	char * bufWaitDel[150];
+	int bufsize[3];
+	int waitDelCnt = 0;
 	PANORAMA_CTX *ctx = NULL;
 	PANORAMA_CFG cfg;
 
@@ -182,9 +207,14 @@ int main(int argc, char **argv)
 	cfg.srcImgHeight = gSrcH;
 	if (userSetOverlap)
 	{
-		cfg.stitchOverlapWidth = gOverlap;
+		cfg.stitchOverlapPercent = (double)gOverlap / gSrcW;
 	}
-	cfg.stitchInterpolationPercent = gStitchWidthPer;
+	else
+	{
+		cfg.stitchOverlapPercent = gStitchOverlapPer;
+		gOverlap = gStitchOverlapPer * gSrcW;
+	}
+	cfg.stitchInterpolationPercent = gInterpolationWidthPer;
 	cfg.panoImageFmt = IMG_FMT_YUV420P_I420;
 	cfg.panoImageWidth = gPanoW;
 	cfg.panoImageHeight = gPanoH;
@@ -196,14 +226,122 @@ int main(int argc, char **argv)
 		goto out;
 	}
 
+	ysize = gSrcH * gSrcW;
+	usize = vsize = (gSrcH / 2) * (gSrcW / 2);
+
+	waitDelCnt = 0;
 	for (i = 0; i < gImgNum; i++)
 	{
 		// 加载图片
-		if (PANORAMA_OK != PanoramaLoadSrcImgFile(ctx,
-					fns[i], gSrcW, gSrcH, IMG_FMT_YUV420P_I420))
+		// 测试PanoramaLoadSrcImgFile接口
+		if (i < gImgNum / 3)
 		{
-			printf("PanoramaLoadSrcImgFile failed\n");
-			goto out;
+			if (PANORAMA_OK != PanoramaLoadSrcImgFile(ctx,
+						fns[i], gSrcW, gSrcH, IMG_FMT_YUV420P_I420))
+			{
+				printf("PanoramaLoadSrcImgFile failed\n");
+				goto out;
+			}
+		}
+		// 测试PanoramaLoadSrcImgFile接口，copy数据到内部
+		else if (i < 2 * gImgNum / 3)
+		{
+			int idx = 0;
+			bufsize[idx] = ysize;
+			fbuf[idx] = (char *)malloc(bufsize[idx] * sizeof(char));
+			if (fbuf[idx] == NULL)
+			{
+				PMD
+				goto out;
+			}
+			idx++;
+			bufsize[idx] = usize;
+			fbuf[idx] = (char *)malloc(bufsize[idx] * sizeof(char));
+			if (fbuf[idx] == NULL)
+			{
+				PMD
+				goto out;
+			}
+			idx++;
+			bufsize[idx] = vsize;
+			fbuf[idx] = (char *)malloc(bufsize[idx] * sizeof(char));
+			if (fbuf[idx] == NULL)
+			{
+				PMD
+				goto out;
+			}
+
+			fp = fopen(fns[i], "r");
+			if (!fp)
+			{
+				PMD
+				goto out;
+			}
+			fread(fbuf[0], bufsize[0], 1, fp);
+			fread(fbuf[1], bufsize[1], 1, fp);
+			fread(fbuf[2], bufsize[2], 1, fp);
+			fclose(fp);
+			fp = NULL;
+
+			if (PANORAMA_OK != PanoramaLoadSrcImgBuffer(ctx, &fbuf[0],
+				&bufsize, 3, gSrcW, gSrcH, IMG_FMT_YUV420P_I420, 1))
+			{
+				printf("PanoramaLoadSrcImgBuffer failed\n");
+				goto out;
+			}
+
+			free(fbuf[0]); fbuf[0] = NULL;
+			free(fbuf[1]); fbuf[1] = NULL;
+			free(fbuf[2]); fbuf[2] = NULL;
+		}
+		// 测试PanoramaLoadSrcImgFile接口，不copy数据到内部
+		else
+		{
+			bufsize[0] = ysize;
+			bufWaitDel[waitDelCnt] = (char *)malloc(bufsize[0] * sizeof(char));
+			if (bufWaitDel[waitDelCnt] == NULL)
+			{
+				PMD
+				goto out;
+			}
+			waitDelCnt++;
+
+			bufsize[1] = usize;
+			bufWaitDel[waitDelCnt] = (char *)malloc(bufsize[1] * sizeof(char));
+			if (bufWaitDel[waitDelCnt] == NULL)
+			{
+				PMD
+				goto out;
+			}
+			waitDelCnt++;
+
+			bufsize[2] = vsize;
+			bufWaitDel[waitDelCnt] = (char *)malloc(bufsize[2] * sizeof(char));
+			if (bufWaitDel[waitDelCnt] == NULL)
+			{
+				PMD
+				goto out;
+			}
+			waitDelCnt++;
+
+			fp = fopen(fns[i], "r");
+			if (!fp)
+			{
+				PMD
+				goto out;
+			}
+			fread(bufWaitDel[waitDelCnt - 3], bufsize[0], 1, fp);
+			fread(bufWaitDel[waitDelCnt - 2], bufsize[1], 1, fp);
+			fread(bufWaitDel[waitDelCnt - 1], bufsize[2], 1, fp);
+			fclose(fp);
+			fp = NULL;
+
+			if (PANORAMA_OK != PanoramaLoadSrcImgBuffer(ctx, &bufWaitDel[waitDelCnt-3],
+				&bufsize, 3, gSrcW, gSrcH, IMG_FMT_YUV420P_I420, 0))
+			{
+				printf("PanoramaLoadSrcImgBuffer failed\n");
+				goto out;
+			}
 		}
 
 		// 处理图片
@@ -221,7 +359,7 @@ int main(int argc, char **argv)
 
 			// 获取总的时间进度
 			totalPercent = PanoramaProcessQuery(ctx);
-			//printf("total process percent: %d/100\n", totalPercent);
+			printf("total process percent: %d/100\n", totalPercent);
 
 			if (PANORAMA_PROCESS_FINISH == curImgPercent)
 			{
@@ -237,18 +375,30 @@ int main(int argc, char **argv)
 			printf("PanoramaFetch failed\n");
 			goto out;
 		}
-		
-		ret = PanoramaGetCfg(ctx, &cfg);
 
-		sprintf(fn, "/home/pg/w/pano-result/pano%d_W%d_H%d_overlap%d_%d_%d.yuv", i, panoW, panoH, cfg.stitchOverlapWidth, gSrcW, gSrcH);
-		fp = fopen(fn, "w+");
-		if (fp)
+		if (i == gImgNum - 1)
 		{
-			fwrite(pano, panoBufSize, 1, fp);
-			fclose(fp);
-			fp = NULL;
+			ret = PanoramaGetCfg(ctx, &cfg);
+
+			sprintf(fn, "/home/pg/w/pano-result/pano%d_W%d_H%d_overlap%d_%d_%d.yuv", i, panoW, panoH, gOverlap, gSrcW, gSrcH);
+			fp = fopen(fn, "w+");
+			if (fp)
+			{
+				fwrite(pano, panoBufSize, 1, fp);
+				fclose(fp);
+				fp = NULL;
+			}
 		}
 	}
+
+	int j = 0;
+	for (j = 0; j < waitDelCnt; j++)
+	{
+		free(bufWaitDel[j]);
+		bufWaitDel[j] = NULL;
+	}
+
+	ret = PanoramaResetCtx(ctx);
 
 	printf("finish\n");
 
